@@ -1,42 +1,101 @@
 import { createClient } from "@/lib/supabaseServer";
 import { StatCard, StatusBadge } from "@/components/Card";
+import MonthFilter from "@/components/MonthFilter";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function monthRange() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+function monthRange(year: number, monthIndex: number) {
+  const start = new Date(year, monthIndex, 1);
+  const end = new Date(year, monthIndex + 1, 0);
   return {
     start: start.toISOString().slice(0, 10),
     end: end.toISOString().slice(0, 10),
-    label: start.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
   };
 }
 
-export default async function DashboardPage() {
-  const supabase = createClient();
-  const { start, end, label } = monthRange();
+function monthLabel(year: number, monthIndex: number) {
+  const label = new Date(year, monthIndex, 1).toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
-  const [recebidoMes, pagoMes, aReceber, aPagar, proximosVencimentos] = await Promise.all([
+function monthOptions() {
+  const now = new Date();
+  const options: { value: string; label: string }[] = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    options.push({ value, label: monthLabel(d.getFullYear(), d.getMonth()) });
+  }
+  return options;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { mes?: string };
+}) {
+  const supabase = createClient();
+  const now = new Date();
+
+  let selectedYear = now.getFullYear();
+  let selectedMonthIndex = now.getMonth(); // 0-indexed
+
+  if (searchParams.mes) {
+    const [y, m] = searchParams.mes.split("-").map(Number);
+    if (y && m) {
+      selectedYear = y;
+      selectedMonthIndex = m - 1;
+    }
+  }
+
+  const selectedMes = `${selectedYear}-${String(selectedMonthIndex + 1).padStart(2, "0")}`;
+  const { start: mesStart, end: mesEnd } = monthRange(selectedYear, selectedMonthIndex);
+  const yearStart = `${selectedYear}-01-01`;
+  const yearEnd = `${selectedYear}-12-31`;
+
+  const [
+    anoRecebido,
+    anoPago,
+    mesProvisionado,
+    mesFaturado,
+    mesCusto,
+    aPagarAberto,
+    proximosVencimentos,
+  ] = await Promise.all([
     supabase
       .from("contas_receber")
       .select("valor")
       .eq("status", "recebido")
-      .gte("data_recebimento", start)
-      .lte("data_recebimento", end),
+      .gte("data_recebimento", yearStart)
+      .lte("data_recebimento", yearEnd),
     supabase
       .from("contas_pagar")
       .select("valor")
       .eq("status", "pago")
-      .gte("data_pagamento", start)
-      .lte("data_pagamento", end),
+      .gte("data_pagamento", yearStart)
+      .lte("data_pagamento", yearEnd),
     supabase
       .from("contas_receber")
       .select("valor")
-      .in("status", ["pendente", "atrasado"]),
+      .gte("data_vencimento", mesStart)
+      .lte("data_vencimento", mesEnd),
+    supabase
+      .from("contas_receber")
+      .select("valor")
+      .eq("status", "recebido")
+      .gte("data_recebimento", mesStart)
+      .lte("data_recebimento", mesEnd),
+    supabase
+      .from("contas_pagar")
+      .select("valor")
+      .eq("status", "pago")
+      .gte("data_pagamento", mesStart)
+      .lte("data_pagamento", mesEnd),
     supabase
       .from("contas_pagar")
       .select("valor")
@@ -52,31 +111,88 @@ export default async function DashboardPage() {
   const sum = (rows: { valor: number }[] | null) =>
     (rows ?? []).reduce((acc, r) => acc + Number(r.valor), 0);
 
-  const faturamento = sum(recebidoMes.data);
-  const despesas = sum(pagoMes.data);
-  const totalAReceber = sum(aReceber.data);
-  const totalAPagar = sum(aPagar.data);
-  const saldoMes = faturamento - despesas;
+  const faturamentoAno = sum(anoRecebido.data);
+  const custoAno = sum(anoPago.data);
+  const saldoAno = faturamentoAno - custoAno;
+
+  const provisionadoMes = sum(mesProvisionado.data);
+  const faturamentoMes = sum(mesFaturado.data);
+  const custoMes = sum(mesCusto.data);
+  const saldoMes = faturamentoMes - custoMes;
+
+  const totalAPagar = sum(aPagarAberto.data);
 
   return (
     <div>
       <div className="mb-6">
-        <p className="font-display font-semibold text-xl text-ink capitalize">Painel — {label}</p>
+        <p className="font-display font-semibold text-xl text-ink">Painel</p>
         <p className="text-sm text-muted mt-0.5">Visão geral das finanças da agência</p>
       </div>
 
+      {/* Ano */}
+      <div className="mb-2">
+        <p className="text-xs font-medium text-muted uppercase tracking-wide">Ano de {selectedYear}</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-6">
+        <StatCard
+          label="Faturamento total do ano"
+          value={formatBRL(faturamentoAno)}
+          hint="Tudo que foi recebido no ano"
+          tone="ledger"
+        />
+        <StatCard
+          label="Custo total do ano"
+          value={formatBRL(custoAno)}
+          hint="Tudo que foi pago no ano"
+          tone="crimson"
+        />
+        <StatCard
+          label="Saldo do ano"
+          value={formatBRL(saldoAno)}
+          hint="Faturamento − custo"
+          tone={saldoAno >= 0 ? "ledger" : "crimson"}
+        />
+      </div>
+
+      {/* Mês selecionado */}
+      <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
+        <p className="text-xs font-medium text-muted uppercase tracking-wide">
+          {monthLabel(selectedYear, selectedMonthIndex)}
+        </p>
+        <MonthFilter options={monthOptions()} selected={selectedMes} />
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard label="Faturamento do mês" value={formatBRL(faturamento)} hint="Recebido no período" tone="ledger" />
-        <StatCard label="Despesas do mês" value={formatBRL(despesas)} hint="Pago no período" tone="crimson" />
-        <StatCard label="Saldo do mês" value={formatBRL(saldoMes)} hint="Faturamento − despesas" tone={saldoMes >= 0 ? "ledger" : "crimson"} />
-        <StatCard label="A receber em aberto" value={formatBRL(totalAReceber)} hint="Pendente + atrasado" tone="amber" />
+        <StatCard
+          label="Provisionado no mês"
+          value={formatBRL(provisionadoMes)}
+          hint="Faturas emitidas (pagas + pendentes)"
+          tone="amber"
+        />
+        <StatCard
+          label="Faturamento do mês"
+          value={formatBRL(faturamentoMes)}
+          hint="O que de fato entrou (recebido)"
+          tone="ledger"
+        />
+        <StatCard
+          label="Custo do mês"
+          value={formatBRL(custoMes)}
+          hint="Pago no período"
+          tone="crimson"
+        />
+        <StatCard
+          label="Saldo do mês"
+          value={formatBRL(saldoMes)}
+          hint="Faturamento − custo"
+          tone={saldoMes >= 0 ? "ledger" : "crimson"}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <div className="bg-white rounded-md shadow-sm p-5">
           <p className="text-sm font-medium text-ink mb-1">Total a pagar em aberto</p>
           <p className="font-mono tabular text-2xl font-semibold text-crimson">{formatBRL(totalAPagar)}</p>
-          <p className="text-xs text-muted mt-1">Somatório de contas pendentes e atrasadas</p>
+          <p className="text-xs text-muted mt-1">Somatório de contas pendentes e atrasadas (todos os meses)</p>
         </div>
         <div className="bg-white rounded-md shadow-sm p-5">
           <p className="text-sm font-medium text-ink mb-1">Fechamento pro contador</p>
