@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-paper text-ink font-body;
+  }
+  ::selection {
+    @apply bg-ledger/20;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* barra de status lateral usada nos cards de conta (o "elemento assinatura" do ERP) */
+.ledger-stripe {
+  border-left: 3px solid var(--stripe-color, #0f6b5c);
+}
