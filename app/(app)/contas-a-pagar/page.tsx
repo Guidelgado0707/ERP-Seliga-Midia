@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabaseClient";
 import { StatusBadge } from "@/components/Card";
+import { monthOptions, currentMonthValue, monthValueRange } from "@/lib/dateUtils";
 
 type Conta = {
   id: string;
@@ -28,6 +29,7 @@ export default function ContasAPagarPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [mes, setMes] = useState(currentMonthValue());
 
   const [form, setForm] = useState({
     descricao: "",
@@ -39,14 +41,20 @@ export default function ContasAPagarPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    const { start, end } = monthValueRange(mes);
     const [c, cat] = await Promise.all([
-      supabase.from("contas_pagar").select("*").order("data_vencimento", { ascending: true }),
+      supabase
+        .from("contas_pagar")
+        .select("*")
+        .gte("data_vencimento", start)
+        .lte("data_vencimento", end)
+        .order("data_vencimento", { ascending: true }),
       supabase.from("categorias").select("id, nome").in("tipo", ["pagar", "ambos"]),
     ]);
     setContas(c.data ?? []);
     setCategorias(cat.data ?? []);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, mes]);
 
   useEffect(() => {
     load();
@@ -91,7 +99,7 @@ export default function ContasAPagarPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `contas-a-pagar-${new Date().toISOString().slice(0, 7)}.csv`;
+    a.download = `contas-a-pagar-${mes}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -104,6 +112,17 @@ export default function ContasAPagarPage() {
           <p className="text-sm text-muted mt-0.5">Fornecedores, salários, impostos e despesas</p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <select
+            value={mes}
+            onChange={(e) => setMes(e.target.value)}
+            className="px-3 py-2 rounded-md border border-line text-sm bg-white text-ink"
+          >
+            {monthOptions().map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
           <button
             onClick={exportarCSV}
             className="text-sm font-medium px-3 py-2 rounded-md border border-line text-ink hover:bg-white transition-colors"
