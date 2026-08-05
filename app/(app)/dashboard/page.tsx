@@ -147,7 +147,7 @@ export default async function DashboardPage({
           tone="crimson"
         />
         <StatCard
-          label="Saldo do ano"
+          label="Lucro líquido ano"
           value={formatBRL(saldoAno)}
           hint="Faturamento − custo"
           tone={saldoAno >= 0 ? "ledger" : "crimson"}
@@ -181,7 +181,7 @@ export default async function DashboardPage({
           tone="crimson"
         />
         <StatCard
-          label="Saldo do mês"
+          label="Lucro líquido mês"
           value={formatBRL(saldoMes)}
           hint="Faturamento − custo"
           tone={saldoMes >= 0 ? "ledger" : "crimson"}
