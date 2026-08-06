@@ -26,7 +26,7 @@ function monthLabel(year: number, monthIndex: number) {
 function monthOptions() {
   const now = new Date();
   const options: { value: string; label: string }[] = [];
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 36; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     options.push({ value, label: monthLabel(d.getFullYear(), d.getMonth()) });

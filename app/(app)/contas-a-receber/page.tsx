@@ -120,7 +120,7 @@ export default function ContasAReceberPage() {
             onChange={(e) => setMes(e.target.value)}
             className="px-3 py-2 rounded-md border border-line text-sm bg-white text-ink"
           >
-            {monthOptions().map((o) => (
+            {monthOptions(36).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
