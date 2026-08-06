@@ -57,6 +57,7 @@ export default async function DashboardPage({
   const { start: mesStart, end: mesEnd } = monthRange(selectedYear, selectedMonthIndex);
   const yearStart = `${selectedYear}-01-01`;
   const yearEnd = `${selectedYear}-12-31`;
+  const hoje = now.toISOString().slice(0, 10);
 
   const [
     anoRecebido,
@@ -66,6 +67,8 @@ export default async function DashboardPage({
     mesCusto,
     aPagarAberto,
     proximosVencimentos,
+    lembretePagar,
+    lembreteReceber,
   ] = await Promise.all([
     supabase
       .from("contas_receber")
@@ -106,6 +109,18 @@ export default async function DashboardPage({
       .in("status", ["pendente", "atrasado"])
       .order("data_vencimento", { ascending: true })
       .limit(5),
+    supabase
+      .from("contas_pagar")
+      .select("id, descricao, fornecedor, valor, data_vencimento")
+      .eq("status", "pendente")
+      .lte("data_vencimento", hoje)
+      .order("data_vencimento", { ascending: true }),
+    supabase
+      .from("contas_receber")
+      .select("id, descricao, cliente, valor, data_vencimento")
+      .eq("status", "pendente")
+      .lte("data_vencimento", hoje)
+      .order("data_vencimento", { ascending: true }),
   ]);
 
   const sum = (rows: { valor: number }[] | null) =>
@@ -122,12 +137,51 @@ export default async function DashboardPage({
 
   const totalAPagar = sum(aPagarAberto.data);
 
+  const contasPagarLembrete = lembretePagar.data ?? [];
+  const contasReceberLembrete = lembreteReceber.data ?? [];
+  const temLembrete = contasPagarLembrete.length > 0 || contasReceberLembrete.length > 0;
+
   return (
     <div>
       <div className="mb-6">
         <p className="font-display font-semibold text-xl text-ink">Painel</p>
         <p className="text-sm text-muted mt-0.5">Visão geral das finanças da agência</p>
       </div>
+
+      {temLembrete && (
+        <div className="bg-amber-soft border border-amber/30 rounded-md p-5 mb-6">
+          <p className="text-sm font-semibold text-ink mb-3">🔔 Lembrete de hoje</p>
+          <div className="space-y-2">
+            {contasPagarLembrete.map((c) => {
+              const vencida = c.data_vencimento < hoje;
+              return (
+                <div key={`p-${c.id}`} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-ink">
+                    {vencida ? "🔴 Venceu" : "🟡 Vence hoje"} — Pagar: {c.descricao}
+                    {c.fornecedor ? ` (${c.fornecedor})` : ""}
+                    {vencida &&
+                      ` · ${new Date(c.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}`}
+                  </span>
+                  <span className="font-mono tabular text-ink shrink-0">{formatBRL(Number(c.valor))}</span>
+                </div>
+              );
+            })}
+            {contasReceberLembrete.map((c) => {
+              const vencida = c.data_vencimento < hoje;
+              return (
+                <div key={`r-${c.id}`} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-ink">
+                    {vencida ? "🔴 Venceu" : "🟡 Vence hoje"} — Receber: {c.descricao} ({c.cliente})
+                    {vencida &&
+                      ` · ${new Date(c.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}`}
+                  </span>
+                  <span className="font-mono tabular text-ink shrink-0">{formatBRL(Number(c.valor))}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Ano */}
       <div className="mb-2">
