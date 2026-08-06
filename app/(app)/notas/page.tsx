@@ -12,6 +12,7 @@ type Nota = {
   data_nota: string | null;
   status: string;
   created_at: string;
+  conta_pagar_id: string | null;
 };
 
 function formatBRL(v: number) {
@@ -87,13 +88,44 @@ export default function NotasPage() {
   }
 
   async function saveEdit(id: string) {
+    const nota = notas.find((n) => n.id === id);
+    const valorNum = editForm.valor ? Number(editForm.valor) : null;
+    const dataNota = editForm.data_nota || new Date().toISOString().slice(0, 10);
+
+    let contaPagarId = nota?.conta_pagar_id ?? null;
+
+    // Se tem valor, lança (ou atualiza) automaticamente em Contas a Pagar,
+    // já como paga, pra contar no Custo do Mês.
+    if (valorNum && valorNum > 0) {
+      const contaPagarPayload = {
+        descricao: editForm.descricao || "Nota fiscal",
+        valor: valorNum,
+        data_vencimento: dataNota,
+        data_pagamento: dataNota,
+        status: "pago",
+        nota_fiscal_url: nota?.arquivo_url ?? null,
+      };
+
+      if (contaPagarId) {
+        await supabase.from("contas_pagar").update(contaPagarPayload).eq("id", contaPagarId);
+      } else {
+        const { data: novaConta } = await supabase
+          .from("contas_pagar")
+          .insert(contaPagarPayload)
+          .select()
+          .single();
+        contaPagarId = novaConta?.id ?? null;
+      }
+    }
+
     await supabase
       .from("notas_fiscais")
       .update({
         descricao: editForm.descricao,
-        valor: editForm.valor ? Number(editForm.valor) : null,
+        valor: valorNum,
         data_nota: editForm.data_nota || null,
         status: "vinculada",
+        conta_pagar_id: contaPagarId,
       })
       .eq("id", id);
     setEditing(null);
@@ -173,11 +205,14 @@ export default function NotasPage() {
                   <p className="font-mono tabular text-sm text-muted">
                     {n.valor ? formatBRL(Number(n.valor)) : "Valor não informado"}
                   </p>
+                  {n.conta_pagar_id && (
+                    <p className="text-xs text-ledger-dark mt-0.5">✓ Lançada em Contas a Pagar</p>
+                  )}
                   <button
                     onClick={() => startEdit(n)}
                     className="text-xs font-medium text-ledger-dark hover:underline mt-1"
                   >
-                    Categorizar
+                    {n.conta_pagar_id ? "Editar categorização" : "Categorizar"}
                   </button>
                 </div>
               )}
