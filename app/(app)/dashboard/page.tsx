@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabaseServer";
 import { StatCard, StatusBadge } from "@/components/Card";
 import MonthFilter from "@/components/MonthFilter";
 import YearFilter from "@/components/YearFilter";
+import RefreshButton from "@/components/RefreshButton";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -155,9 +156,12 @@ export default async function DashboardPage({
 
   return (
     <div>
-      <div className="mb-6">
-        <p className="font-display font-semibold text-xl text-ink">Painel</p>
-        <p className="text-sm text-muted mt-0.5">Visão geral das finanças da agência</p>
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <div>
+          <p className="font-display font-semibold text-xl text-ink">Painel</p>
+          <p className="text-sm text-muted mt-0.5">Visão geral das finanças da agência</p>
+        </div>
+        <RefreshButton />
       </div>
 
       {temLembrete && (
