@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabaseServer";
 import { StatCard, StatusBadge } from "@/components/Card";
 import MonthFilter from "@/components/MonthFilter";
+import YearFilter from "@/components/YearFilter";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -34,29 +35,40 @@ function monthOptions() {
   return options;
 }
 
+function yearOptions() {
+  const now = new Date();
+  const options: { value: string; label: string }[] = [];
+  for (let y = now.getFullYear(); y >= now.getFullYear() - 5; y--) {
+    options.push({ value: String(y), label: String(y) });
+  }
+  return options;
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { mes?: string };
+  searchParams: { mes?: string; ano?: string };
 }) {
   const supabase = createClient();
   const now = new Date();
 
-  let selectedYear = now.getFullYear();
+  let selectedMonthYear = now.getFullYear();
   let selectedMonthIndex = now.getMonth(); // 0-indexed
 
   if (searchParams.mes) {
     const [y, m] = searchParams.mes.split("-").map(Number);
     if (y && m) {
-      selectedYear = y;
+      selectedMonthYear = y;
       selectedMonthIndex = m - 1;
     }
   }
 
-  const selectedMes = `${selectedYear}-${String(selectedMonthIndex + 1).padStart(2, "0")}`;
-  const { start: mesStart, end: mesEnd } = monthRange(selectedYear, selectedMonthIndex);
-  const yearStart = `${selectedYear}-01-01`;
-  const yearEnd = `${selectedYear}-12-31`;
+  const selectedAno = searchParams.ano ? Number(searchParams.ano) : now.getFullYear();
+
+  const selectedMes = `${selectedMonthYear}-${String(selectedMonthIndex + 1).padStart(2, "0")}`;
+  const { start: mesStart, end: mesEnd } = monthRange(selectedMonthYear, selectedMonthIndex);
+  const yearStart = `${selectedAno}-01-01`;
+  const yearEnd = `${selectedAno}-12-31`;
   const hoje = now.toISOString().slice(0, 10);
 
   const [
@@ -184,8 +196,9 @@ export default async function DashboardPage({
       )}
 
       {/* Ano */}
-      <div className="mb-2">
-        <p className="text-xs font-medium text-muted uppercase tracking-wide">Ano de {selectedYear}</p>
+      <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
+        <p className="text-xs font-medium text-muted uppercase tracking-wide">Ano de {selectedAno}</p>
+        <YearFilter options={yearOptions()} selected={String(selectedAno)} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-6">
         <StatCard
@@ -211,7 +224,7 @@ export default async function DashboardPage({
       {/* Mês selecionado */}
       <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
         <p className="text-xs font-medium text-muted uppercase tracking-wide">
-          {monthLabel(selectedYear, selectedMonthIndex)}
+          {monthLabel(selectedMonthYear, selectedMonthIndex)}
         </p>
         <MonthFilter options={monthOptions()} selected={selectedMes} />
       </div>

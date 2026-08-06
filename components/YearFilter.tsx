@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 type Option = { value: string; label: string };
 
-export default function MonthFilter({
+export default function YearFilter({
   options,
   selected,
 }: {
@@ -16,7 +16,7 @@ export default function MonthFilter({
 
   function handleChange(value: string) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("mes", value);
+    params.set("ano", value);
     router.push(`/dashboard?${params.toString()}`);
   }
 
@@ -24,10 +24,10 @@ export default function MonthFilter({
     <select
       value={selected}
       onChange={(e) => handleChange(e.target.value)}
-      className="px-3 py-2 rounded-md border border-line text-sm bg-white text-ink capitalize"
+      className="px-3 py-2 rounded-md border border-line text-sm bg-white text-ink"
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value} className="capitalize">
+        <option key={o.value} value={o.value}>
           {o.label}
         </option>
       ))}
