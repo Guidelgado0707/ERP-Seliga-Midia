@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabaseClient";
-import { StatusBadge } from "@/components/Card";
+import { StatCard, StatusBadge } from "@/components/Card";
 import { monthOptions, currentMonthValue, monthValueRange } from "@/lib/dateUtils";
 
 type Conta = {
@@ -84,6 +84,11 @@ export default function ContasAPagarPage() {
     load();
   }
 
+  const sum = (rows: Conta[]) => rows.reduce((acc, c) => acc + Number(c.valor), 0);
+  const totalPago = sum(contas.filter((c) => c.status === "pago"));
+  const totalPendente = sum(contas.filter((c) => c.status === "pendente" || c.status === "atrasado"));
+  const totalProvisionado = sum(contas.filter((c) => c.status !== "cancelado"));
+
   function exportarCSV() {
     const header = ["Descrição", "Fornecedor", "Valor", "Vencimento", "Pagamento", "Status"];
     const rows = contas.map((c) => [
@@ -136,6 +141,12 @@ export default function ContasAPagarPage() {
             {showForm ? "Cancelar" : "+ Nova conta"}
           </button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4">
+        <StatCard label="Provisionado do mês" value={formatBRL(totalProvisionado)} hint="Pago + pendente" tone="amber" />
+        <StatCard label="Já pago" value={formatBRL(totalPago)} hint="Contas quitadas no mês" tone="ledger" />
+        <StatCard label="Pendente" value={formatBRL(totalPendente)} hint="Ainda não paguei" tone="crimson" />
       </div>
 
       {showForm && (
