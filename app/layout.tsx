@@ -23,6 +23,11 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Agência ERP",
   description: "Gestão financeira da agência — contas a pagar, a receber e dividendos",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Agência ERP",
+  },
 };
 
 export const viewport: Viewport = {
