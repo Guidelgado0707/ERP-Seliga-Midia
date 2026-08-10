@@ -47,6 +47,12 @@ export default function PropostasPage() {
     load();
   }, [load]);
 
+  async function handleDelete(id: string, nomeEmpresa: string) {
+    if (!window.confirm(`Apagar a proposta de "${nomeEmpresa}"? Essa ação não pode ser desfeita.`)) return;
+    setPropostas((ps) => ps.filter((p) => p.id !== id));
+    await supabase.from("propostas").delete().eq("id", id);
+  }
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -209,6 +215,14 @@ export default function PropostasPage() {
                   className="text-xs font-medium text-ledger-dark hover:underline"
                 >
                   Ver / Baixar PDF
+                </button>
+                <button
+                  onClick={() => handleDelete(p.id, p.empresa)}
+                  title="Apagar proposta"
+                  aria-label="Apagar proposta"
+                  className="text-muted hover:text-crimson transition-colors"
+                >
+                  🗑
                 </button>
               </div>
             </div>
