@@ -80,7 +80,11 @@ export default function ContasAPagarPage() {
   async function marcarComoPago(id: string) {
     await supabase
       .from("contas_pagar")
-      .update({ status: "pago", data_pagamento: new Date().toISOString().slice(0, 10) })
+      .update({
+        status: "pago",
+        data_pagamento: new Date().toISOString().slice(0, 10),
+        pago_em: new Date().toISOString(),
+      })
       .eq("id", id);
     load();
   }

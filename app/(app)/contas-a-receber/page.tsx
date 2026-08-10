@@ -83,7 +83,11 @@ export default function ContasAReceberPage() {
   async function marcarComoRecebido(id: string) {
     await supabase
       .from("contas_receber")
-      .update({ status: "recebido", data_recebimento: new Date().toISOString().slice(0, 10) })
+      .update({
+        status: "recebido",
+        data_recebimento: new Date().toISOString().slice(0, 10),
+        recebido_em: new Date().toISOString(),
+      })
       .eq("id", id);
     load();
   }

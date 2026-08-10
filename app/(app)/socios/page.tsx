@@ -121,6 +121,7 @@ export default function SociosPage() {
         valor: valorNum,
         data_vencimento: data,
         data_pagamento: data,
+        pago_em: new Date().toISOString(),
         status: "pago",
       })
       .select()

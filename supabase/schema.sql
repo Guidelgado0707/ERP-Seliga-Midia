@@ -26,6 +26,7 @@ create table contas_pagar (
   valor numeric(12,2) not null,
   data_vencimento date not null,
   data_pagamento date,
+  pago_em timestamptz, -- momento exato em que foi marcado como pago (pra calcular o Caixa certinho)
   status text not null default 'pendente' check (status in ('pendente', 'pago', 'atrasado', 'cancelado')),
   forma_pagamento text,
   observacoes text,
@@ -43,6 +44,7 @@ create table contas_receber (
   valor numeric(12,2) not null,
   data_vencimento date not null,
   data_recebimento date,
+  recebido_em timestamptz, -- momento exato em que foi marcado como recebido (pra calcular o Caixa certinho)
   status text not null default 'pendente' check (status in ('pendente', 'recebido', 'atrasado', 'cancelado')),
   gera_credito_cliente boolean not null default false,
   observacoes text,

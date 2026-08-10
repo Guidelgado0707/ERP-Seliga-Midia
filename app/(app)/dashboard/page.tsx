@@ -139,7 +139,7 @@ export default async function DashboardPage({
 
   const caixaRefRes = await supabase
     .from("caixa_referencia")
-    .select("conta, data_referencia, valor")
+    .select("conta, data_referencia, valor, created_at")
     .order("data_referencia", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -152,19 +152,20 @@ export default async function DashboardPage({
 
   let saldoContaCorrente = 0;
   if (refContaCorrente) {
-    // o valor informado já reflete o saldo "agora" (incluindo o que já
-    // aconteceu na própria data_referencia) — então só soma o que vier DEPOIS.
+    // o valor informado já reflete o saldo no momento exato em que foi salvo
+    // (created_at) — então só soma/subtrai o que foi marcado como pago/recebido
+    // DEPOIS desse instante, mesmo que no mesmo dia.
     const [recebidoDesde, pagoDesde] = await Promise.all([
       supabase
         .from("contas_receber")
         .select("valor")
         .eq("status", "recebido")
-        .gt("data_recebimento", refContaCorrente.data_referencia),
+        .gt("recebido_em", refContaCorrente.created_at),
       supabase
         .from("contas_pagar")
         .select("valor")
         .eq("status", "pago")
-        .gt("data_pagamento", refContaCorrente.data_referencia),
+        .gt("pago_em", refContaCorrente.created_at),
     ]);
     saldoContaCorrente = Number(refContaCorrente.valor) + sumLocal(recebidoDesde.data) - sumLocal(pagoDesde.data);
   }

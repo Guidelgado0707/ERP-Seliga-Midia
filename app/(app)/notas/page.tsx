@@ -102,6 +102,7 @@ export default function NotasPage() {
         valor: valorNum,
         data_vencimento: dataNota,
         data_pagamento: dataNota,
+        pago_em: new Date().toISOString(),
         status: "pago",
         nota_fiscal_url: nota?.arquivo_url ?? null,
       };
