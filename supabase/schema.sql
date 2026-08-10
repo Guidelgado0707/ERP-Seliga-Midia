@@ -11,6 +11,9 @@ create table categorias (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   tipo text not null check (tipo in ('pagar', 'receber', 'ambos')),
+  -- só relevante pra categorias de despesa (pagar/ambos); usado na DRE pro
+  -- ponto de equilíbrio e margem de contribuição. null = tratado como variável.
+  tipo_custo text check (tipo_custo in ('fixo', 'variavel')),
   created_at timestamptz not null default now()
 );
 

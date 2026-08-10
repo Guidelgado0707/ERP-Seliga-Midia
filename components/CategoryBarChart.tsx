@@ -9,14 +9,22 @@ function formatBRL(v: number) {
 }
 
 // Barras horizontais, hue único (magnitude, não identidade) — ver skill de dataviz.
-export default function CategoryBarChart({ items }: { items: Item[] }) {
+export default function CategoryBarChart({
+  items,
+  color = "#B3261E",
+  emptyLabel = "Sem custos categorizados neste período ainda.",
+}: {
+  items: Item[];
+  color?: string;
+  emptyLabel?: string;
+}) {
   const [hovered, setHovered] = useState<string | null>(null);
   const sorted = [...items].filter((i) => i.value > 0).sort((a, b) => b.value - a.value);
   const max = Math.max(...sorted.map((i) => i.value), 1);
   const total = sorted.reduce((acc, i) => acc + i.value, 0);
 
   if (sorted.length === 0) {
-    return <p className="text-sm text-muted px-5 py-6">Sem custos categorizados neste período ainda.</p>;
+    return <p className="text-sm text-muted px-5 py-6">{emptyLabel}</p>;
   }
 
   return (
@@ -48,7 +56,7 @@ export default function CategoryBarChart({ items }: { items: Item[] }) {
                 className="h-full rounded-full transition-[filter]"
                 style={{
                   width: `${widthPct}%`,
-                  backgroundColor: "#B3261E",
+                  backgroundColor: color,
                   filter: isHovered ? "brightness(1.15)" : "none",
                 }}
               />
