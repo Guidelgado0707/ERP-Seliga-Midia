@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/notas", label: "Notas", icon: "▤" },
   { href: "/socios", label: "Sócios", icon: "◍" },
   { href: "/propostas", label: "Propostas", icon: "◈" },
+  { href: "/dre", label: "DRE", icon: "▦" },
 ];
 
 export default function Nav() {

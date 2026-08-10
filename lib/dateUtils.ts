@@ -35,3 +35,12 @@ export function monthValueRange(value: string) {
   const [year, month] = value.split("-").map(Number);
   return monthRange(year, month - 1);
 }
+
+export function yearOptions(back = 5) {
+  const now = new Date();
+  const options: { value: string; label: string }[] = [];
+  for (let y = now.getFullYear(); y >= now.getFullYear() - back; y--) {
+    options.push({ value: String(y), label: String(y) });
+  }
+  return options;
+}
