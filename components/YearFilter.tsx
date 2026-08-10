@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 type Option = { value: string; label: string };
 
@@ -13,11 +13,12 @@ export default function YearFilter({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   function handleChange(value: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("ano", value);
-    router.push(`/dashboard?${params.toString()}`);
+    router.push(`${pathname}?${params.toString()}`);
   }
 
   return (
