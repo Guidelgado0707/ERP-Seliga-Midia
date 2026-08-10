@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabaseClient";
 import { StatCard, StatusBadge } from "@/components/Card";
+import CategoryBarChart from "@/components/CategoryBarChart";
 import { monthOptions, currentMonthValue, monthValueRange } from "@/lib/dateUtils";
 
 type Conta = {
@@ -84,10 +85,30 @@ export default function ContasAPagarPage() {
     load();
   }
 
+  async function atualizarCategoria(id: string, categoria_id: string) {
+    // atualiza local primeiro pra não esperar o round-trip
+    setContas((cs) => cs.map((c) => (c.id === id ? { ...c, categoria_id: categoria_id || null } : c)));
+    await supabase
+      .from("contas_pagar")
+      .update({ categoria_id: categoria_id || null })
+      .eq("id", id);
+  }
+
   const sum = (rows: Conta[]) => rows.reduce((acc, c) => acc + Number(c.valor), 0);
   const totalPago = sum(contas.filter((c) => c.status === "pago"));
   const totalPendente = sum(contas.filter((c) => c.status === "pendente" || c.status === "atrasado"));
   const totalProvisionado = sum(contas.filter((c) => c.status !== "cancelado"));
+
+  const custosPorCategoria = (() => {
+    const nomeMap = new Map(categorias.map((c) => [c.id, c.nome]));
+    const totals = new Map<string, number>();
+    for (const c of contas) {
+      if (c.status === "cancelado") continue;
+      const label = c.categoria_id ? nomeMap.get(c.categoria_id) ?? "Sem categoria" : "Sem categoria";
+      totals.set(label, (totals.get(label) ?? 0) + Number(c.valor));
+    }
+    return Array.from(totals, ([label, value]) => ({ label, value }));
+  })();
 
   function exportarCSV() {
     const header = ["Descrição", "Fornecedor", "Valor", "Vencimento", "Pagamento", "Status"];
@@ -147,6 +168,14 @@ export default function ContasAPagarPage() {
         <StatCard label="Provisionado do mês" value={formatBRL(totalProvisionado)} hint="Pago + pendente" tone="amber" />
         <StatCard label="Já pago" value={formatBRL(totalPago)} hint="Contas quitadas no mês" tone="ledger" />
         <StatCard label="Pendente" value={formatBRL(totalPendente)} hint="Ainda não paguei" tone="crimson" />
+      </div>
+
+      <div className="bg-white rounded-md shadow-sm mb-4">
+        <div className="px-5 py-4 border-b border-line">
+          <p className="text-sm font-medium text-ink">Custos por categoria</p>
+          <p className="text-xs text-muted mt-0.5">Ajuda a ver onde cortar — categorize as contas na lista abaixo</p>
+        </div>
+        <CategoryBarChart items={custosPorCategoria} />
       </div>
 
       {showForm && (
@@ -216,6 +245,18 @@ export default function ContasAPagarPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
+                <select
+                  value={c.categoria_id ?? ""}
+                  onChange={(e) => atualizarCategoria(c.id, e.target.value)}
+                  className="text-xs px-2 py-1.5 rounded-md border border-line bg-white text-muted max-w-[140px]"
+                >
+                  <option value="">Sem categoria</option>
+                  {categorias.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.nome}
+                    </option>
+                  ))}
+                </select>
                 <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(c.valor))}</span>
                 <StatusBadge status={c.status} />
                 {c.status !== "pago" && (
