@@ -44,12 +44,23 @@ function montarDRE(receitaRows: ContaRow[], pagarRows: ContaRow[], categorias: C
 
   const receitaLiquida = receitaBruta - impostos;
   const totalDespesas = totalFixas + totalVariaveis;
-  const resultadoLiquido = receitaLiquida - totalDespesas;
-  const margem = receitaBruta > 0 ? (resultadoLiquido / receitaBruta) * 100 : 0;
 
-  // margem de contribuição = quanto sobra da receita líquida depois dos custos variáveis
-  const margemContribuicao = receitaLiquida > 0 ? (receitaLiquida - totalVariaveis) / receitaLiquida : 0;
-  const pontoEquilibrio = margemContribuicao > 0 ? totalFixas / margemContribuicao : null;
+  // Lucro Operacional (EBIT): resultado das operações, antes de resultado financeiro.
+  // Como o sistema não rastreia receitas/despesas financeiras, e o regime é Simples
+  // Nacional (sem IR/CSLL apurado à parte — já embutido no imposto sobre a receita),
+  // Lucro Operacional = Lucro Líquido do período nesta DRE.
+  const lucroOperacional = receitaLiquida - totalDespesas;
+  const lucroLiquido = lucroOperacional;
+  const margemOperacional = receitaLiquida > 0 ? (lucroOperacional / receitaLiquida) * 100 : 0;
+  const margemLiquida = receitaLiquida > 0 ? (lucroLiquido / receitaLiquida) * 100 : 0;
+
+  // Margem de contribuição (custeio variável): impostos sobre a receita são
+  // proporcionais ao faturamento, então contam como variáveis aqui — mesmo já
+  // aparecendo deduzidos antes na DRE. Base = Receita Bruta (padrão contábil).
+  const custosVariaveisTotal = impostos + totalVariaveis;
+  const margemContribuicaoValor = receitaBruta - custosVariaveisTotal;
+  const indiceMC = receitaBruta > 0 ? margemContribuicaoValor / receitaBruta : 0;
+  const pontoEquilibrio = indiceMC > 0 ? totalFixas / indiceMC : null;
 
   return {
     receitas,
@@ -61,9 +72,12 @@ function montarDRE(receitaRows: ContaRow[], pagarRows: ContaRow[], categorias: C
     totalFixas,
     totalVariaveis,
     totalDespesas,
-    resultadoLiquido,
-    margem,
-    margemContribuicao,
+    lucroOperacional,
+    lucroLiquido,
+    margemOperacional,
+    margemLiquida,
+    margemContribuicaoValor,
+    indiceMC,
     pontoEquilibrio,
   };
 }
@@ -107,25 +121,46 @@ function DREBloco({ dre }: { dre: ReturnType<typeof montarDRE> }) {
       ))}
       <DreLinha label="(-) Total despesas variáveis" value={-dre.totalVariaveis} variant="subtotal" />
 
-      <DreLinha label="= Resultado líquido do período" value={dre.resultadoLiquido} variant="total" />
-      <div className="px-5 pb-3 -mt-1">
+      <DreLinha label="= Lucro operacional (EBIT)" value={dre.lucroOperacional} variant="total" />
+      <div className="px-5 pb-2 -mt-1">
         <p className="text-xs text-muted">
-          Margem líquida: <span className="font-mono tabular">{dre.margem.toFixed(1)}%</span>
+          Margem operacional: <span className="font-mono tabular">{dre.margemOperacional.toFixed(1)}%</span>
         </p>
       </div>
 
+      <DreLinha label="= Lucro líquido do período" value={dre.lucroLiquido} variant="total" />
+      <div className="px-5 pb-1 -mt-1">
+        <p className="text-xs text-muted">
+          Margem líquida: <span className="font-mono tabular">{dre.margemLiquida.toFixed(1)}%</span>
+        </p>
+      </div>
+      <p className="px-5 pb-3 text-[11px] text-muted leading-relaxed">
+        No Simples Nacional o imposto sobre o lucro já vem embutido no imposto sobre a receita, e o sistema não
+        rastreia receitas/despesas financeiras — por isso Lucro Operacional = Lucro Líquido aqui.
+      </p>
+
       <div className="px-5 py-3 bg-paper border-t-2 border-line space-y-1.5">
-        <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">Ponto de equilíbrio</p>
+        <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">
+          Ponto de equilíbrio (custeio variável)
+        </p>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-ink">Margem de contribuição</span>
-          <span className="font-mono tabular text-ink">{(dre.margemContribuicao * 100).toFixed(1)}%</span>
+          <span className="text-ink">Margem de contribuição (R$)</span>
+          <span className="font-mono tabular text-ink">{formatBRL(dre.margemContribuicaoValor)}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-ink">Receita mínima pra não ter prejuízo</span>
+          <span className="text-ink">Índice de margem de contribuição</span>
+          <span className="font-mono tabular text-ink">{(dre.indiceMC * 100).toFixed(1)}%</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-ink">Ponto de equilíbrio contábil</span>
           <span className="font-mono tabular text-ink">
             {dre.pontoEquilibrio !== null ? formatBRL(dre.pontoEquilibrio) : "—"}
           </span>
         </div>
+        <p className="text-[11px] text-muted leading-relaxed pt-1">
+          Receita bruta mínima pra cobrir custos fixos e variáveis (impostos inclusos, por serem proporcionais
+          à receita) sem lucro nem prejuízo.
+        </p>
       </div>
     </div>
   );
