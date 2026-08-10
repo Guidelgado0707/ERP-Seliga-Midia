@@ -3,6 +3,7 @@ import { StatCard, StatusBadge } from "@/components/Card";
 import MonthFilter from "@/components/MonthFilter";
 import YearFilter from "@/components/YearFilter";
 import RefreshButton from "@/components/RefreshButton";
+import CaixaCard from "@/components/CaixaCard";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -136,6 +137,41 @@ export default async function DashboardPage({
       .order("data_vencimento", { ascending: true }),
   ]);
 
+  const caixaRefRes = await supabase
+    .from("caixa_referencia")
+    .select("conta, data_referencia, valor")
+    .order("data_referencia", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  const todasReferencias = caixaRefRes.data ?? [];
+  const refContaCorrente = todasReferencias.find((r) => r.conta === "Conta Corrente") ?? null;
+  const refReserva = todasReferencias.find((r) => r.conta === "Reserva de Emergência") ?? null;
+
+  const sumLocal = (rows: { valor: number }[] | null) =>
+    (rows ?? []).reduce((acc, r) => acc + Number(r.valor), 0);
+
+  let saldoContaCorrente = 0;
+  if (refContaCorrente) {
+    // o valor informado já reflete o saldo "agora" (incluindo o que já
+    // aconteceu na própria data_referencia) — então só soma o que vier DEPOIS.
+    const [recebidoDesde, pagoDesde] = await Promise.all([
+      supabase
+        .from("contas_receber")
+        .select("valor")
+        .eq("status", "recebido")
+        .gt("data_recebimento", refContaCorrente.data_referencia),
+      supabase
+        .from("contas_pagar")
+        .select("valor")
+        .eq("status", "pago")
+        .gt("data_pagamento", refContaCorrente.data_referencia),
+    ]);
+    saldoContaCorrente = Number(refContaCorrente.valor) + sumLocal(recebidoDesde.data) - sumLocal(pagoDesde.data);
+  }
+
+  // Reserva de emergência fica parada — não some/soma com contas a pagar/receber.
+  const saldoReserva = refReserva ? Number(refReserva.valor) : 0;
+
   const sum = (rows: { valor: number }[] | null) =>
     (rows ?? []).reduce((acc, r) => acc + Number(r.valor), 0);
 
@@ -163,6 +199,12 @@ export default async function DashboardPage({
         </div>
         <RefreshButton />
       </div>
+
+      <CaixaCard
+        contaCorrente={{ saldo: saldoContaCorrente, dataReferencia: refContaCorrente?.data_referencia ?? null }}
+        reserva={{ saldo: saldoReserva, dataReferencia: refReserva?.data_referencia ?? null }}
+        temReferencia={todasReferencias.length > 0}
+      />
 
       {temLembrete && (
         <div className="bg-amber-soft border border-amber/30 rounded-md p-5 mb-6">

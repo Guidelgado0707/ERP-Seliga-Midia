@@ -93,6 +93,22 @@ create table pro_labore (
   created_by uuid references auth.users(id) default auth.uid()
 );
 
+-- ---------- CAIXA (ponto de referência pra calcular o saldo atual) ----------
+-- O saldo "agora" = valor mais recente aqui + tudo recebido/pago desde data_referencia.
+-- Recalibre sempre que quiser conferir contra o extrato bancário real.
+create table caixa_referencia (
+  id uuid primary key default gen_random_uuid(),
+  -- "Conta Corrente": some/soma sozinha com contas a receber/pagar desde data_referencia.
+  -- "Reserva de Emergência": fica parada, só muda quando você registra um novo ajuste manual.
+  conta text not null default 'Conta Corrente'
+    check (conta in ('Conta Corrente', 'Reserva de Emergência')),
+  data_referencia date not null,
+  valor numeric(12,2) not null,
+  observacoes text,
+  created_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) default auth.uid()
+);
+
 -- ---------- PROPOSTAS COMERCIAIS (Girando na Alta) ----------
 create table propostas (
   id uuid primary key default gen_random_uuid(),
@@ -138,6 +154,7 @@ alter table dividendos_socios enable row level security;
 alter table notas_fiscais enable row level security;
 alter table pro_labore enable row level security;
 alter table propostas enable row level security;
+alter table caixa_referencia enable row level security;
 
 create policy "authenticated_full_access" on categorias
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -156,6 +173,8 @@ create policy "authenticated_full_access" on notas_fiscais
 create policy "authenticated_full_access" on pro_labore
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "authenticated_full_access" on propostas
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "authenticated_full_access" on caixa_referencia
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ============================================================
