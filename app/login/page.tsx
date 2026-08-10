@@ -33,7 +33,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-paper px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <p className="font-display font-semibold text-2xl text-ink">Agência ERP</p>
+          <p className="font-display font-semibold text-2xl text-ink">Gestão Seliga Mídia</p>
           <p className="text-sm text-muted mt-1">Entre para acessar sua gestão financeira</p>
         </div>
 

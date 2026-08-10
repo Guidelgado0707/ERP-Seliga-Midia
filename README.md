@@ -1,4 +1,4 @@
-# Agência ERP
+# Gestão Seliga Mídia
 
 Sistema de gestão financeira: contas a pagar, contas a receber, controle de notas fiscais
 pelo celular e distribuição de dividendos entre sócios.

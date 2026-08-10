@@ -28,7 +28,7 @@ export default function Nav() {
       {/* Desktop: sidebar fixa à esquerda */}
       <aside className="hidden md:flex md:flex-col md:w-60 md:fixed md:inset-y-0 border-r border-line bg-white">
         <div className="px-6 py-6 border-b border-line">
-          <p className="font-display font-semibold text-lg tracking-tight text-ink">Agência ERP</p>
+          <p className="font-display font-semibold text-lg tracking-tight text-ink">Gestão Seliga Mídia</p>
           <p className="text-xs text-muted mt-0.5">Gestão financeira</p>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
