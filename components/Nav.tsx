@@ -6,12 +6,12 @@ import { createClient } from "@/lib/supabaseClient";
 
 const ITEMS = [
   { href: "/dashboard", label: "Painel", icon: "◧" },
+  { href: "/dre", label: "DRE", icon: "▦" },
   { href: "/contas-a-pagar", label: "A Pagar", icon: "↑" },
   { href: "/contas-a-receber", label: "A Receber", icon: "↓" },
   { href: "/notas", label: "Notas", icon: "▤" },
   { href: "/socios", label: "Sócios", icon: "◍" },
   { href: "/propostas", label: "Propostas", icon: "◈" },
-  { href: "/dre", label: "DRE", icon: "▦" },
 ];
 
 export default function Nav() {
