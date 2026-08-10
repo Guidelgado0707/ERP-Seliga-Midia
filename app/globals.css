@@ -36,8 +36,15 @@
     top: 0;
     left: 0;
     width: 100%;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #proposta-print-area * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   @page {
+    size: A4;
     margin: 0;
   }
 }
