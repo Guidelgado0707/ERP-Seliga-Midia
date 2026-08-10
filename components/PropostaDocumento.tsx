@@ -5,6 +5,17 @@
 const NAVY = "#0F1B2E";
 const ORANGE = "#E8611E";
 
+export const CRIADORES = ["Girando na Alta", "Lucas Feitoza", "Seliga Mídia"] as const;
+export type Criador = (typeof CRIADORES)[number];
+
+// artigo: usado em "O Girando na Alta transforma..." / "A Seliga Mídia transforma..." / "" pra nome próprio
+// contraido: usado em "identidade do Girando na Alta" / "da Seliga Mídia" / "de Lucas Feitoza"
+const GRAMATICA: Record<Criador, { artigo: string; contraido: string }> = {
+  "Girando na Alta": { artigo: "O", contraido: "do" },
+  "Lucas Feitoza": { artigo: "", contraido: "de" },
+  "Seliga Mídia": { artigo: "A", contraido: "da" },
+};
+
 const AUDIENCIA = {
   instagramSeguidores: "+204 MIL",
   instagramVisualizacoes: "3,6 MILHÕES",
@@ -38,17 +49,28 @@ function formatBRL(v: number) {
 
 export type PropostaDados = {
   empresa: string;
+  criador?: Criador | string | null;
+  meses: number;
   quantidade_videos: number;
   valor_unitario: number;
   resumo?: string | null;
 };
 
-export default function PropostaDocumento({ empresa, quantidade_videos, valor_unitario, resumo }: PropostaDados) {
+export default function PropostaDocumento({
+  empresa,
+  criador,
+  meses,
+  quantidade_videos,
+  valor_unitario,
+  resumo,
+}: PropostaDados) {
   const total = quantidade_videos * valor_unitario;
-  const meses = 3;
   const videosPorMes = Math.round(quantidade_videos / meses);
   const ano = new Date().getFullYear();
   const nomeEmpresa = empresa || "Sua Empresa";
+  const nomeCriador: Criador = (criador as Criador) && GRAMATICA[criador as Criador] ? (criador as Criador) : "Girando na Alta";
+  const { artigo, contraido } = GRAMATICA[nomeCriador];
+  const isSeligaMidia = nomeCriador === "Seliga Mídia";
 
   return (
     <div
@@ -67,12 +89,12 @@ export default function PropostaDocumento({ empresa, quantidade_videos, valor_un
             </span>
           </div>
           <p className="text-white/60 text-[10px] tracking-wide uppercase">
-            Girando na Alta &nbsp;|&nbsp; Proposta Comercial &nbsp;|&nbsp; {ano}
+            {nomeCriador} &nbsp;|&nbsp; Proposta Comercial &nbsp;|&nbsp; {ano}
           </p>
         </div>
         <div className="border-t border-white/15 pt-4">
           <p className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: ORANGE }}>
-            {nomeEmpresa.toUpperCase()} + GIRANDO NA ALTA
+            {nomeEmpresa.toUpperCase()} + {nomeCriador.toUpperCase()}
           </p>
           <h1 className="text-white font-bold text-2xl md:text-[28px] leading-tight mb-2">
             Conteúdo que movimenta
@@ -80,7 +102,8 @@ export default function PropostaDocumento({ empresa, quantidade_videos, valor_un
             marca, público e negócio.
           </h1>
           <p className="text-white/70 text-[13px]">
-            Uma parceria de {meses} meses para construir presença digital recorrente e relevante.
+            Uma parceria de {meses} {meses === 1 ? "mês" : "meses"} para construir presença digital recorrente e
+            relevante.
           </p>
         </div>
       </div>
@@ -92,7 +115,8 @@ export default function PropostaDocumento({ empresa, quantidade_videos, valor_un
             A Parceria
           </p>
           <p className="text-[13px] text-neutral-700 leading-snug mb-4">
-            O <strong>Girando na Alta</strong> transforma o universo automotivo em conteúdo leve, dinâmico e
+            {artigo && `${artigo} `}
+            <strong>{nomeCriador}</strong> transforma o universo automotivo em conteúdo leve, dinâmico e
             bem-humorado. A proposta conecta essa linguagem à {nomeEmpresa} para apresentar produtos e
             oportunidades comerciais com naturalidade, consistência e alto potencial de descoberta.
           </p>
@@ -224,11 +248,13 @@ export default function PropostaDocumento({ empresa, quantidade_videos, valor_un
         <div className="border-t border-neutral-200 pt-3 flex flex-col md:flex-row md:items-end md:justify-between gap-2">
           <p className="text-[11px] text-neutral-500 max-w-md leading-snug">
             A linha editorial será definida em conjunto, alinhando os objetivos comerciais da {nomeEmpresa} à
-            identidade do Girando na Alta.
+            identidade {contraido} {nomeCriador}.
           </p>
           <div className="text-right">
             <p className="text-[11px] text-neutral-500">Proposta válida por 15 dias.</p>
-            <p className="text-[11px] font-bold text-neutral-800">Girando na Alta / Seligamidia</p>
+            <p className="text-[11px] font-bold text-neutral-800">
+              {isSeligaMidia ? "Seliga Mídia" : `${nomeCriador} / Seliga Mídia`}
+            </p>
           </div>
         </div>
       </div>

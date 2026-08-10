@@ -94,6 +94,9 @@ create table pro_labore (
 create table propostas (
   id uuid primary key default gen_random_uuid(),
   empresa text not null,
+  criador text not null default 'Girando na Alta'
+    check (criador in ('Girando na Alta', 'Lucas Feitoza', 'Seliga Mídia')),
+  meses integer not null default 3,
   quantidade_videos integer not null,
   valor_unitario numeric(12,2) not null,
   resumo text,

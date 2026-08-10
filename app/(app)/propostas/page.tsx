@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabaseClient";
-import PropostaDocumento from "@/components/PropostaDocumento";
+import PropostaDocumento, { CRIADORES } from "@/components/PropostaDocumento";
 
 type Proposta = {
   id: string;
   empresa: string;
+  criador: string;
+  meses: number;
   quantidade_videos: number;
   valor_unitario: number;
   resumo: string | null;
@@ -27,6 +29,8 @@ export default function PropostasPage() {
 
   const [form, setForm] = useState({
     empresa: "",
+    criador: CRIADORES[0] as string,
+    meses: "3",
     quantidade_videos: "",
     valor_unitario: "",
     resumo: "",
@@ -50,13 +54,15 @@ export default function PropostasPage() {
       .from("propostas")
       .insert({
         empresa: form.empresa,
+        criador: form.criador,
+        meses: Number(form.meses),
         quantidade_videos: Number(form.quantidade_videos),
         valor_unitario: Number(form.valor_unitario),
         resumo: form.resumo || null,
       })
       .select()
       .single();
-    setForm({ empresa: "", quantidade_videos: "", valor_unitario: "", resumo: "" });
+    setForm({ empresa: "", criador: CRIADORES[0], meses: "3", quantidade_videos: "", valor_unitario: "", resumo: "" });
     setShowForm(false);
     setSaving(false);
     await load();
@@ -83,6 +89,8 @@ export default function PropostasPage() {
         <div className="shadow-sm rounded-lg overflow-hidden">
           <PropostaDocumento
             empresa={visualizando.empresa}
+            criador={visualizando.criador}
+            meses={visualizando.meses}
             quantidade_videos={visualizando.quantidade_videos}
             valor_unitario={Number(visualizando.valor_unitario)}
             resumo={visualizando.resumo}
@@ -97,7 +105,7 @@ export default function PropostasPage() {
       <div className="flex items-start justify-between gap-3 mb-6">
         <div>
           <p className="font-display font-semibold text-xl text-ink">Propostas</p>
-          <p className="text-sm text-muted mt-0.5">Proposta comercial do Girando na Alta, pronta pra exportar em PDF</p>
+          <p className="text-sm text-muted mt-0.5">Proposta comercial pronta pra exportar em PDF</p>
         </div>
         <button
           onClick={() => setShowForm((s) => !s)}
@@ -116,11 +124,31 @@ export default function PropostasPage() {
             onChange={(e) => setForm({ ...form, empresa: e.target.value })}
             className="px-3 py-2.5 rounded-md border border-line text-sm md:col-span-2"
           />
+          <select
+            value={form.criador}
+            onChange={(e) => setForm({ ...form, criador: e.target.value })}
+            className="px-3 py-2.5 rounded-md border border-line text-sm md:col-span-2"
+          >
+            {CRIADORES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
           <input
             required
             type="number"
             min="1"
-            placeholder="Quantidade de vídeos"
+            placeholder="Quantidade de meses"
+            value={form.meses}
+            onChange={(e) => setForm({ ...form, meses: e.target.value })}
+            className="px-3 py-2.5 rounded-md border border-line text-sm font-mono"
+          />
+          <input
+            required
+            type="number"
+            min="1"
+            placeholder="Quantidade de vídeos (total)"
             value={form.quantidade_videos}
             onChange={(e) => setForm({ ...form, quantidade_videos: e.target.value })}
             className="px-3 py-2.5 rounded-md border border-line text-sm font-mono"
@@ -132,7 +160,7 @@ export default function PropostasPage() {
             placeholder="Valor unitário por vídeo (R$)"
             value={form.valor_unitario}
             onChange={(e) => setForm({ ...form, valor_unitario: e.target.value })}
-            className="px-3 py-2.5 rounded-md border border-line text-sm font-mono"
+            className="px-3 py-2.5 rounded-md border border-line text-sm font-mono md:col-span-2"
           />
           <textarea
             placeholder="Resumo dos vídeos que podemos fazer (opcional — se deixar em branco, usa as frentes de conteúdo padrão)"
@@ -144,6 +172,7 @@ export default function PropostasPage() {
           {form.empresa && form.quantidade_videos && form.valor_unitario && (
             <p className="text-xs text-muted md:col-span-2">
               Total: {formatBRL(Number(form.quantidade_videos) * Number(form.valor_unitario))}
+              {form.meses && ` · ${Math.round(Number(form.quantidade_videos) / Number(form.meses))} vídeos/mês`}
             </p>
           )}
           <button
@@ -167,8 +196,8 @@ export default function PropostasPage() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink truncate">{p.empresa}</p>
                 <p className="text-xs text-muted">
-                  {p.quantidade_videos} vídeos · {formatBRL(Number(p.valor_unitario))}/vídeo ·{" "}
-                  {new Date(p.created_at).toLocaleDateString("pt-BR")}
+                  {p.criador} · {p.quantidade_videos} vídeos em {p.meses} {p.meses === 1 ? "mês" : "meses"} ·{" "}
+                  {formatBRL(Number(p.valor_unitario))}/vídeo · {new Date(p.created_at).toLocaleDateString("pt-BR")}
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
