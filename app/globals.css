@@ -21,3 +21,23 @@
 .ledger-stripe {
   border-left: 3px solid var(--stripe-color, #0f6b5c);
 }
+
+/* Impressão de proposta: some com o resto do app, imprime só o documento */
+@media print {
+  body:has(#proposta-print-area) * {
+    visibility: hidden;
+  }
+  body:has(#proposta-print-area) #proposta-print-area,
+  body:has(#proposta-print-area) #proposta-print-area * {
+    visibility: visible;
+  }
+  #proposta-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  @page {
+    margin: 0;
+  }
+}

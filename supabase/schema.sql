@@ -90,6 +90,17 @@ create table pro_labore (
   created_by uuid references auth.users(id) default auth.uid()
 );
 
+-- ---------- PROPOSTAS COMERCIAIS (Girando na Alta) ----------
+create table propostas (
+  id uuid primary key default gen_random_uuid(),
+  empresa text not null,
+  quantidade_videos integer not null,
+  valor_unitario numeric(12,2) not null,
+  resumo text,
+  created_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) default auth.uid()
+);
+
 -- ---------- NOTAS FISCAIS / RECIBOS AVULSOS (upload pelo celular) ----------
 -- Usada pro fluxo "tirei foto da nota do almoço e joguei no app"
 create table notas_fiscais (
@@ -120,6 +131,7 @@ alter table dividendos enable row level security;
 alter table dividendos_socios enable row level security;
 alter table notas_fiscais enable row level security;
 alter table pro_labore enable row level security;
+alter table propostas enable row level security;
 
 create policy "authenticated_full_access" on categorias
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -136,6 +148,8 @@ create policy "authenticated_full_access" on dividendos_socios
 create policy "authenticated_full_access" on notas_fiscais
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "authenticated_full_access" on pro_labore
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "authenticated_full_access" on propostas
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ============================================================

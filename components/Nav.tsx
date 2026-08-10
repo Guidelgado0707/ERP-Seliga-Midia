@@ -10,6 +10,7 @@ const ITEMS = [
   { href: "/contas-a-receber", label: "A Receber", icon: "↓" },
   { href: "/notas", label: "Notas", icon: "▤" },
   { href: "/socios", label: "Sócios", icon: "◍" },
+  { href: "/propostas", label: "Propostas", icon: "◈" },
 ];
 
 export default function Nav() {
