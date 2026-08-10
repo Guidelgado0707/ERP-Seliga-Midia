@@ -10,6 +10,12 @@ type Distribuicao = {
   lucro_distribuivel: number;
   dividendos_socios: { id: string; socio_id: string; valor: number; pago: boolean }[];
 };
+type ProLabore = {
+  id: string;
+  socio_id: string;
+  valor: number;
+  data_pagamento: string;
+};
 
 function formatBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -19,6 +25,7 @@ export default function SociosPage() {
   const supabase = createClient();
   const [socios, setSocios] = useState<Socio[]>([]);
   const [distribuicoes, setDistribuicoes] = useState<Distribuicao[]>([]);
+  const [proLabores, setProLabores] = useState<ProLabore[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [novoSocio, setNovoSocio] = useState({ nome: "", percentual_participacao: "" });
@@ -26,19 +33,28 @@ export default function SociosPage() {
 
   const [novaDistribuicao, setNovaDistribuicao] = useState({ mes: "", lucro: "" });
   const [showDistForm, setShowDistForm] = useState(false);
+
+  const [novoProLabore, setNovoProLabore] = useState({ socio_id: "", valor: "", data_pagamento: "" });
+  const [showProLaboreForm, setShowProLaboreForm] = useState(false);
+
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [s, d] = await Promise.all([
+    const [s, d, pl] = await Promise.all([
       supabase.from("socios").select("*").eq("ativo", true).order("nome"),
       supabase
         .from("dividendos")
         .select("id, mes_referencia, lucro_distribuivel, dividendos_socios(id, socio_id, valor, pago)")
         .order("mes_referencia", { ascending: false }),
+      supabase
+        .from("pro_labore")
+        .select("id, socio_id, valor, data_pagamento")
+        .order("data_pagamento", { ascending: false }),
     ]);
     setSocios(s.data ?? []);
     setDistribuicoes((d.data as any) ?? []);
+    setProLabores(pl.data ?? []);
     setLoading(false);
   }, [supabase]);
 
@@ -86,6 +102,39 @@ export default function SociosPage() {
 
     setNovaDistribuicao({ mes: "", lucro: "" });
     setShowDistForm(false);
+    setSaving(false);
+    load();
+  }
+
+  async function handleRegistrarProLabore(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+
+    const socio = socios.find((s) => s.id === novoProLabore.socio_id);
+    const valorNum = Number(novoProLabore.valor);
+    const data = novoProLabore.data_pagamento || new Date().toISOString().slice(0, 10);
+
+    const { data: contaPagar } = await supabase
+      .from("contas_pagar")
+      .insert({
+        descricao: `Pró-labore - ${socio?.nome ?? "Sócio"}`,
+        valor: valorNum,
+        data_vencimento: data,
+        data_pagamento: data,
+        status: "pago",
+      })
+      .select()
+      .single();
+
+    await supabase.from("pro_labore").insert({
+      socio_id: novoProLabore.socio_id,
+      valor: valorNum,
+      data_pagamento: data,
+      conta_pagar_id: contaPagar?.id ?? null,
+    });
+
+    setNovoProLabore({ socio_id: "", valor: "", data_pagamento: "" });
+    setShowProLaboreForm(false);
     setSaving(false);
     load();
   }
@@ -159,6 +208,86 @@ export default function SociosPage() {
           ))}
           {!loading && socios.length === 0 && (
             <p className="px-5 py-6 text-sm text-muted">Cadastre os sócios pra começar a distribuir dividendos.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Pró-labore */}
+      <div className="bg-white rounded-md shadow-sm mb-6">
+        <div className="px-5 py-4 border-b border-line flex items-center justify-between">
+          <p className="text-sm font-medium text-ink">Pró-labore</p>
+          <button
+            onClick={() => setShowProLaboreForm((s) => !s)}
+            disabled={socios.length === 0}
+            className="text-xs font-medium text-ledger-dark hover:underline disabled:opacity-40"
+          >
+            {showProLaboreForm ? "Cancelar" : "+ Registrar pró-labore"}
+          </button>
+        </div>
+
+        {showProLaboreForm && (
+          <form
+            onSubmit={handleRegistrarProLabore}
+            className="px-5 py-4 border-b border-line flex flex-col md:flex-row gap-3"
+          >
+            <select
+              required
+              value={novoProLabore.socio_id}
+              onChange={(e) => setNovoProLabore({ ...novoProLabore, socio_id: e.target.value })}
+              className="px-3 py-2.5 rounded-md border border-line text-sm"
+            >
+              <option value="">Sócio</option>
+              {socios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
+            <input
+              required
+              type="number"
+              step="0.01"
+              placeholder="Valor (R$)"
+              value={novoProLabore.valor}
+              onChange={(e) => setNovoProLabore({ ...novoProLabore, valor: e.target.value })}
+              className="flex-1 px-3 py-2.5 rounded-md border border-line text-sm font-mono"
+            />
+            <input
+              required
+              type="date"
+              value={novoProLabore.data_pagamento}
+              onChange={(e) => setNovoProLabore({ ...novoProLabore, data_pagamento: e.target.value })}
+              className="px-3 py-2.5 rounded-md border border-line text-sm"
+            />
+            <button
+              disabled={saving}
+              type="submit"
+              className="bg-ledger text-white text-sm font-medium px-4 py-2.5 rounded-md hover:bg-ledger-dark transition-colors disabled:opacity-60"
+            >
+              Registrar
+            </button>
+          </form>
+        )}
+
+        <div className="divide-y divide-line">
+          {proLabores.map((pl) => {
+            const socio = socios.find((s) => s.id === pl.socio_id);
+            return (
+              <div key={pl.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-ink">{socio?.nome ?? "Sócio"}</p>
+                  <p className="text-xs text-muted">
+                    {new Date(pl.data_pagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(pl.valor))}</span>
+              </div>
+            );
+          })}
+          {!loading && proLabores.length === 0 && (
+            <p className="px-5 py-6 text-sm text-muted">
+              Nenhum pró-labore registrado ainda. Cada registro já entra automaticamente no Custo do Mês.
+            </p>
           )}
         </div>
       </div>
