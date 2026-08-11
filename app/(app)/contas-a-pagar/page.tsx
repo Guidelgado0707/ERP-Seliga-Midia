@@ -15,6 +15,7 @@ type Conta = {
   data_pagamento: string | null;
   status: string;
   categoria_id: string | null;
+  forma_pagamento: string | null;
 };
 
 type Categoria = { id: string; nome: string };
@@ -261,7 +262,14 @@ export default function ContasAPagarPage() {
           {contas.map((c) => (
             <div key={c.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-ink truncate">{c.descricao}</p>
+                <p className="text-sm font-medium text-ink truncate">
+                  {c.descricao}
+                  {c.forma_pagamento && (
+                    <span className="ml-2 text-[10px] font-medium text-muted bg-paper border border-line px-1.5 py-0.5 rounded">
+                      {c.forma_pagamento}
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-muted">
                   {c.fornecedor || "—"} · vence em{" "}
                   {new Date(c.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
