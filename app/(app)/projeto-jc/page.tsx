@@ -3,7 +3,22 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabaseClient";
 import { StatCard, StatusBadge } from "@/components/Card";
-import { monthOptions, currentMonthValue, monthValueRange } from "@/lib/dateUtils";
+import { currentMonthValue, monthValueRange, monthLabel } from "@/lib/dateUtils";
+
+// Projeto JC roda só de julho a outubro de 2026 — filtro de mês fica restrito a esse período.
+const PROJETO_JC_MESES = [
+  { value: "2026-07", label: monthLabel(2026, 6) },
+  { value: "2026-08", label: monthLabel(2026, 7) },
+  { value: "2026-09", label: monthLabel(2026, 8) },
+  { value: "2026-10", label: monthLabel(2026, 9) },
+];
+
+function mesInicialProjetoJC() {
+  const atual = currentMonthValue();
+  const valores = PROJETO_JC_MESES.map((m) => m.value);
+  if (valores.includes(atual)) return atual;
+  return atual < PROJETO_JC_MESES[0].value ? PROJETO_JC_MESES[0].value : PROJETO_JC_MESES[PROJETO_JC_MESES.length - 1].value;
+}
 
 type ContaPagar = {
   id: string;
@@ -42,7 +57,7 @@ export default function ProjetoJCPage() {
   const [pagar, setPagar] = useState<ContaPagar[]>([]);
   const [receber, setReceber] = useState<ContaReceber[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mes, setMes] = useState(currentMonthValue());
+  const [mes, setMes] = useState(mesInicialProjetoJC());
 
   const [showPagarForm, setShowPagarForm] = useState(false);
   const [showReceberForm, setShowReceberForm] = useState(false);
@@ -193,7 +208,7 @@ export default function ProjetoJCPage() {
             onChange={(e) => setMes(e.target.value)}
             className="px-3 py-2 rounded-md border border-line text-sm bg-white text-ink"
           >
-            {monthOptions(36).map((o) => (
+            {PROJETO_JC_MESES.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
