@@ -134,6 +134,20 @@ export default function ContasAPagarPage() {
     return Array.from(totals, ([label, value]) => ({ label, value }));
   })();
 
+  const resumoPorCategoria = (() => {
+    const nomeMap = new Map(categorias.map((c) => [c.id, c.nome]));
+    const dados = new Map<string, { itens: number; valor: number }>();
+    for (const c of contas) {
+      if (c.status === "cancelado") continue;
+      const label = c.categoria_id ? nomeMap.get(c.categoria_id) ?? "Sem categoria" : "Sem categoria";
+      const atual = dados.get(label) ?? { itens: 0, valor: 0 };
+      dados.set(label, { itens: atual.itens + 1, valor: atual.valor + Number(c.valor) });
+    }
+    return Array.from(dados, ([label, d]) => ({ label, ...d })).sort((a, b) => b.valor - a.valor);
+  })();
+  const totalResumo = resumoPorCategoria.reduce((acc, r) => acc + r.valor, 0);
+  const totalItensResumo = resumoPorCategoria.reduce((acc, r) => acc + r.itens, 0);
+
   function exportarCSV() {
     const header = ["Descrição", "Fornecedor", "Valor", "Vencimento", "Pagamento", "Status"];
     const rows = contas.map((c) => [
@@ -317,6 +331,42 @@ export default function ContasAPagarPage() {
           ))}
         </div>
       </div>
+
+      {resumoPorCategoria.length > 0 && (
+        <div className="bg-white rounded-md shadow-sm mt-4 overflow-hidden">
+          <div className="px-5 py-4 border-b border-line">
+            <p className="text-sm font-medium text-ink">Resumo por categoria</p>
+            <p className="text-xs text-muted mt-0.5">Categoria, quantidade de lançamentos e valor total do mês</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs font-medium text-muted uppercase tracking-wide text-left">
+                  <th className="px-5 py-2.5">Categoria</th>
+                  <th className="px-5 py-2.5 text-right">Itens</th>
+                  <th className="px-5 py-2.5 text-right">Valor</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {resumoPorCategoria.map((r) => (
+                  <tr key={r.label}>
+                    <td className="px-5 py-2.5 text-ink">{r.label}</td>
+                    <td className="px-5 py-2.5 text-right font-mono tabular text-muted">{r.itens}</td>
+                    <td className="px-5 py-2.5 text-right font-mono tabular text-ink">{formatBRL(r.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-line font-medium">
+                  <td className="px-5 py-2.5 text-ink">Total</td>
+                  <td className="px-5 py-2.5 text-right font-mono tabular text-ink">{totalItensResumo}</td>
+                  <td className="px-5 py-2.5 text-right font-mono tabular text-ink">{formatBRL(totalResumo)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
