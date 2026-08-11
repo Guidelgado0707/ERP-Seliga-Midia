@@ -92,6 +92,24 @@ export default function ContasAReceberPage() {
     load();
   }
 
+  async function desfazerRecebimento(id: string) {
+    await supabase
+      .from("contas_receber")
+      .update({
+        status: "pendente",
+        data_recebimento: null,
+        recebido_em: null,
+      })
+      .eq("id", id);
+    load();
+  }
+
+  async function apagarConta(id: string) {
+    if (!confirm("Tem certeza que deseja apagar esta conta? Essa ação não pode ser desfeita.")) return;
+    await supabase.from("contas_receber").delete().eq("id", id);
+    load();
+  }
+
   async function atualizarCategoria(id: string, categoria_id: string) {
     setContas((cs) => cs.map((c) => (c.id === id ? { ...c, categoria_id: categoria_id || null } : c)));
     await supabase
@@ -287,14 +305,28 @@ export default function ContasAReceberPage() {
                 </select>
                 <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(c.valor))}</span>
                 <StatusBadge status={c.status} />
-                {c.status !== "recebido" && (
+                {c.status !== "recebido" ? (
                   <button
                     onClick={() => marcarComoRecebido(c.id)}
                     className="text-xs font-medium text-ledger-dark hover:underline"
                   >
                     Marcar recebido
                   </button>
+                ) : (
+                  <button
+                    onClick={() => desfazerRecebimento(c.id)}
+                    className="text-xs font-medium text-amber hover:underline"
+                  >
+                    Desfazer
+                  </button>
                 )}
+                <button
+                  onClick={() => apagarConta(c.id)}
+                  className="text-xs font-medium text-crimson hover:underline"
+                  title="Apagar conta"
+                >
+                  Apagar
+                </button>
               </div>
             </div>
           ))}

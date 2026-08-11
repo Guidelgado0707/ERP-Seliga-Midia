@@ -89,6 +89,24 @@ export default function ContasAPagarPage() {
     load();
   }
 
+  async function desfazerPagamento(id: string) {
+    await supabase
+      .from("contas_pagar")
+      .update({
+        status: "pendente",
+        data_pagamento: null,
+        pago_em: null,
+      })
+      .eq("id", id);
+    load();
+  }
+
+  async function apagarConta(id: string) {
+    if (!confirm("Tem certeza que deseja apagar esta conta? Essa ação não pode ser desfeita.")) return;
+    await supabase.from("contas_pagar").delete().eq("id", id);
+    load();
+  }
+
   async function atualizarCategoria(id: string, categoria_id: string) {
     // atualiza local primeiro pra não esperar o round-trip
     setContas((cs) => cs.map((c) => (c.id === id ? { ...c, categoria_id: categoria_id || null } : c)));
@@ -263,14 +281,28 @@ export default function ContasAPagarPage() {
                 </select>
                 <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(c.valor))}</span>
                 <StatusBadge status={c.status} />
-                {c.status !== "pago" && (
+                {c.status !== "pago" ? (
                   <button
                     onClick={() => marcarComoPago(c.id)}
                     className="text-xs font-medium text-ledger-dark hover:underline"
                   >
                     Marcar pago
                   </button>
+                ) : (
+                  <button
+                    onClick={() => desfazerPagamento(c.id)}
+                    className="text-xs font-medium text-amber hover:underline"
+                  >
+                    Desfazer
+                  </button>
                 )}
+                <button
+                  onClick={() => apagarConta(c.id)}
+                  className="text-xs font-medium text-crimson hover:underline"
+                  title="Apagar conta"
+                >
+                  Apagar
+                </button>
               </div>
             </div>
           ))}
