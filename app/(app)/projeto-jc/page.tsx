@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabaseClient";
 import { StatCard, StatusBadge } from "@/components/Card";
 import { currentMonthValue, monthValueRange, monthLabel } from "@/lib/dateUtils";
 
-// Projeto JC roda só de julho a outubro de 2026 — filtro de mês fica restrito a esse período.
+// Projeto JC roda de maio (começou dia 15/05) a outubro de 2026 — filtro de mês fica restrito a esse período.
 const PROJETO_JC_MESES = [
+  { value: "2026-05", label: monthLabel(2026, 4) },
+  { value: "2026-06", label: monthLabel(2026, 5) },
   { value: "2026-07", label: monthLabel(2026, 6) },
   { value: "2026-08", label: monthLabel(2026, 7) },
   { value: "2026-09", label: monthLabel(2026, 8) },
