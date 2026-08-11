@@ -32,6 +32,7 @@ export default function ContasAPagarPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mes, setMes] = useState(currentMonthValue());
+  const [filtroFormaPagamento, setFiltroFormaPagamento] = useState("");
 
   const [form, setForm] = useState({
     descricao: "",
@@ -118,15 +119,23 @@ export default function ContasAPagarPage() {
       .eq("id", id);
   }
 
+  const formasPagamentoDisponiveis = Array.from(
+    new Set(contas.map((c) => c.forma_pagamento).filter((f): f is string => !!f))
+  ).sort();
+
+  const contasFiltradas = filtroFormaPagamento
+    ? contas.filter((c) => c.forma_pagamento === filtroFormaPagamento)
+    : contas;
+
   const sum = (rows: Conta[]) => rows.reduce((acc, c) => acc + Number(c.valor), 0);
-  const totalPago = sum(contas.filter((c) => c.status === "pago"));
-  const totalPendente = sum(contas.filter((c) => c.status === "pendente" || c.status === "atrasado"));
-  const totalProvisionado = sum(contas.filter((c) => c.status !== "cancelado"));
+  const totalPago = sum(contasFiltradas.filter((c) => c.status === "pago"));
+  const totalPendente = sum(contasFiltradas.filter((c) => c.status === "pendente" || c.status === "atrasado"));
+  const totalProvisionado = sum(contasFiltradas.filter((c) => c.status !== "cancelado"));
 
   const custosPorCategoria = (() => {
     const nomeMap = new Map(categorias.map((c) => [c.id, c.nome]));
     const totals = new Map<string, number>();
-    for (const c of contas) {
+    for (const c of contasFiltradas) {
       if (c.status === "cancelado") continue;
       const label = c.categoria_id ? nomeMap.get(c.categoria_id) ?? "Sem categoria" : "Sem categoria";
       totals.set(label, (totals.get(label) ?? 0) + Number(c.valor));
@@ -137,7 +146,7 @@ export default function ContasAPagarPage() {
   const resumoPorCategoria = (() => {
     const nomeMap = new Map(categorias.map((c) => [c.id, c.nome]));
     const dados = new Map<string, { itens: number; valor: number }>();
-    for (const c of contas) {
+    for (const c of contasFiltradas) {
       if (c.status === "cancelado") continue;
       const label = c.categoria_id ? nomeMap.get(c.categoria_id) ?? "Sem categoria" : "Sem categoria";
       const atual = dados.get(label) ?? { itens: 0, valor: 0 };
@@ -149,21 +158,22 @@ export default function ContasAPagarPage() {
   const totalItensResumo = resumoPorCategoria.reduce((acc, r) => acc + r.itens, 0);
 
   function exportarCSV() {
-    const header = ["Descrição", "Fornecedor", "Valor", "Vencimento", "Pagamento", "Status"];
-    const rows = contas.map((c) => [
+    const header = ["Descrição", "Fornecedor", "Valor", "Vencimento", "Pagamento", "Status", "Forma de pagamento"];
+    const rows = contasFiltradas.map((c) => [
       c.descricao,
       c.fornecedor ?? "",
       String(c.valor).replace(".", ","),
       c.data_vencimento,
       c.data_pagamento ?? "",
       c.status,
+      c.forma_pagamento ?? "",
     ]);
     const csv = [header, ...rows].map((r) => r.map((v) => `"${v}"`).join(";")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `contas-a-pagar-${mes}.csv`;
+    a.download = `contas-a-pagar-${mes}${filtroFormaPagamento ? "-" + filtroFormaPagamento : ""}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -187,6 +197,20 @@ export default function ContasAPagarPage() {
               </option>
             ))}
           </select>
+          {formasPagamentoDisponiveis.length > 0 && (
+            <select
+              value={filtroFormaPagamento}
+              onChange={(e) => setFiltroFormaPagamento(e.target.value)}
+              className="px-3 py-2 rounded-md border border-line text-sm bg-white text-ink"
+            >
+              <option value="">Todas as formas de pagamento</option>
+              {formasPagamentoDisponiveis.map((f) => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             onClick={exportarCSV}
             className="text-sm font-medium px-3 py-2 rounded-md border border-line text-ink hover:bg-white transition-colors"
@@ -269,11 +293,13 @@ export default function ContasAPagarPage() {
 
       <div className="bg-white rounded-md shadow-sm">
         {loading && <p className="px-5 py-6 text-sm text-muted">Carregando...</p>}
-        {!loading && contas.length === 0 && (
-          <p className="px-5 py-6 text-sm text-muted">Nenhuma conta cadastrada ainda.</p>
+        {!loading && contasFiltradas.length === 0 && (
+          <p className="px-5 py-6 text-sm text-muted">
+            {contas.length === 0 ? "Nenhuma conta cadastrada ainda." : "Nenhuma conta com essa forma de pagamento neste mês."}
+          </p>
         )}
         <div className="divide-y divide-line">
-          {contas.map((c) => (
+          {contasFiltradas.map((c) => (
             <div key={c.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink truncate">
