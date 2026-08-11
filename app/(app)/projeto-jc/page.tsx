@@ -47,6 +47,7 @@ export default function ProjetoJCPage() {
   const [showPagarForm, setShowPagarForm] = useState(false);
   const [showReceberForm, setShowReceberForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "pagar" | "receber">("todos");
 
   const [formPagar, setFormPagar] = useState({ descricao: "", fornecedor: "", valor: "", data_vencimento: "" });
   const [formReceber, setFormReceber] = useState({ descricao: "", cliente: "", valor: "", data_vencimento: "" });
@@ -174,6 +175,8 @@ export default function ProjetoJCPage() {
       status: c.status,
     })),
   ].sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
+
+  const lancamentosFiltrados = lancamentos.filter((l) => filtroTipo === "todos" || l.tipo === filtroTipo);
 
   return (
     <div>
@@ -318,13 +321,48 @@ export default function ProjetoJCPage() {
         </form>
       )}
 
+      <div className="flex gap-2 mb-3">
+        <button
+          onClick={() => setFiltroTipo("todos")}
+          className={`text-sm font-medium px-3 py-2 rounded-md border transition-colors ${
+            filtroTipo === "todos" ? "bg-ink text-white border-ink" : "bg-white text-ink border-line hover:bg-paper"
+          }`}
+        >
+          Todos ({lancamentos.length})
+        </button>
+        <button
+          onClick={() => setFiltroTipo("receber")}
+          className={`text-sm font-medium px-3 py-2 rounded-md border transition-colors ${
+            filtroTipo === "receber"
+              ? "bg-ledger text-white border-ledger"
+              : "bg-white text-ledger-dark border-line hover:bg-paper"
+          }`}
+        >
+          A Receber ({receber.length})
+        </button>
+        <button
+          onClick={() => setFiltroTipo("pagar")}
+          className={`text-sm font-medium px-3 py-2 rounded-md border transition-colors ${
+            filtroTipo === "pagar"
+              ? "bg-crimson text-white border-crimson"
+              : "bg-white text-crimson border-line hover:bg-paper"
+          }`}
+        >
+          A Pagar ({pagar.length})
+        </button>
+      </div>
+
       <div className="bg-white rounded-md shadow-sm">
         {loading && <p className="px-5 py-6 text-sm text-muted">Carregando...</p>}
-        {!loading && lancamentos.length === 0 && (
-          <p className="px-5 py-6 text-sm text-muted">Nenhum lançamento do Projeto JC neste mês ainda.</p>
+        {!loading && lancamentosFiltrados.length === 0 && (
+          <p className="px-5 py-6 text-sm text-muted">
+            {lancamentos.length === 0
+              ? "Nenhum lançamento do Projeto JC neste mês ainda."
+              : "Nenhum lançamento desse tipo neste mês."}
+          </p>
         )}
         <div className="divide-y divide-line">
-          {lancamentos.map((l) => (
+          {lancamentosFiltrados.map((l) => (
             <div key={`${l.tipo}-${l.id}`} className="px-5 py-3.5 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink truncate">
