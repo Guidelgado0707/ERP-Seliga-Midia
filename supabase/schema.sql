@@ -100,6 +100,19 @@ create table pro_labore (
   created_by uuid references auth.users(id) default auth.uid()
 );
 
+-- ---------- PROJETO JC — ajuste manual de lucro líquido por mês ----------
+-- O saldo (recebido - pago) do mês é calculado automaticamente, mas às vezes o
+-- resultado real difere por acertos internos que não entram como lançamento.
+-- Essa tabela guarda um valor manual opcional por mês, sem alterar receita/despesa.
+create table projeto_jc_ajustes (
+  id uuid primary key default gen_random_uuid(),
+  mes text not null unique, -- formato 'YYYY-MM'
+  lucro_liquido numeric(12,2) not null,
+  observacoes text,
+  created_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) default auth.uid()
+);
+
 -- ---------- CAIXA (ponto de referência pra calcular o saldo atual) ----------
 -- O saldo "agora" = valor mais recente aqui + tudo recebido/pago desde data_referencia.
 -- Recalibre sempre que quiser conferir contra o extrato bancário real.
@@ -162,6 +175,7 @@ alter table notas_fiscais enable row level security;
 alter table pro_labore enable row level security;
 alter table propostas enable row level security;
 alter table caixa_referencia enable row level security;
+alter table projeto_jc_ajustes enable row level security;
 
 create policy "authenticated_full_access" on categorias
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -182,6 +196,8 @@ create policy "authenticated_full_access" on pro_labore
 create policy "authenticated_full_access" on propostas
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "authenticated_full_access" on caixa_referencia
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "authenticated_full_access" on projeto_jc_ajustes
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ============================================================

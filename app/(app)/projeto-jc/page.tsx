@@ -40,6 +40,12 @@ type ContaReceber = {
   status: string;
 };
 
+type Ajuste = {
+  mes: string;
+  lucro_liquido: number;
+  observacoes: string | null;
+};
+
 type Lancamento = {
   id: string;
   tipo: "pagar" | "receber";
@@ -69,10 +75,15 @@ export default function ProjetoJCPage() {
   const [formPagar, setFormPagar] = useState({ descricao: "", fornecedor: "", valor: "", data_vencimento: "" });
   const [formReceber, setFormReceber] = useState({ descricao: "", cliente: "", valor: "", data_vencimento: "" });
 
+  const [ajuste, setAjuste] = useState<Ajuste | null>(null);
+  const [showAjusteForm, setShowAjusteForm] = useState(false);
+  const [ajusteValor, setAjusteValor] = useState("");
+  const [savingAjuste, setSavingAjuste] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     const { start, end } = monthValueRange(mes);
-    const [p, r] = await Promise.all([
+    const [p, r, a] = await Promise.all([
       supabase
         .from("contas_pagar")
         .select("id, descricao, fornecedor, valor, data_vencimento, status")
@@ -87,9 +98,11 @@ export default function ProjetoJCPage() {
         .gte("data_vencimento", start)
         .lte("data_vencimento", end)
         .order("data_vencimento", { ascending: true }),
+      supabase.from("projeto_jc_ajustes").select("mes, lucro_liquido, observacoes").eq("mes", mes).maybeSingle(),
     ]);
     setPagar(p.data ?? []);
     setReceber(r.data ?? []);
+    setAjuste(a.data ?? null);
     setLoading(false);
   }, [supabase, mes]);
 
@@ -167,6 +180,28 @@ export default function ProjetoJCPage() {
     load();
   }
 
+  function abrirAjusteForm() {
+    setAjusteValor(ajuste ? String(ajuste.lucro_liquido) : "");
+    setShowAjusteForm(true);
+  }
+
+  async function salvarAjuste(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingAjuste(true);
+    await supabase
+      .from("projeto_jc_ajustes")
+      .upsert({ mes, lucro_liquido: Number(ajusteValor) }, { onConflict: "mes" });
+    setSavingAjuste(false);
+    setShowAjusteForm(false);
+    load();
+  }
+
+  async function removerAjuste() {
+    if (!confirm("Remover o ajuste de lucro líquido deste mês? O card volta a mostrar o saldo calculado (recebido − pago).")) return;
+    await supabase.from("projeto_jc_ajustes").delete().eq("mes", mes);
+    load();
+  }
+
   const sum = (rows: { valor: number }[]) => rows.reduce((acc, c) => acc + Number(c.valor), 0);
   const recebidoMes = sum(receber.filter((c) => c.status === "recebido"));
   const pagoMes = sum(pagar.filter((c) => c.status === "pago"));
@@ -237,7 +272,7 @@ export default function ProjetoJCPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 mb-2">
         <StatCard label="Recebido no mês" value={formatBRL(recebidoMes)} hint="Entradas do Projeto JC" tone="ledger" />
         <StatCard label="Pago no mês" value={formatBRL(pagoMes)} hint="Saídas do Projeto JC" tone="crimson" />
         <StatCard
@@ -246,11 +281,63 @@ export default function ProjetoJCPage() {
           hint="Recebido − pago (impacto na conta corrente)"
           tone={saldoMes >= 0 ? "ledger" : "crimson"}
         />
+        <StatCard
+          label="Lucro líquido real"
+          value={formatBRL(ajuste ? ajuste.lucro_liquido : saldoMes)}
+          hint={ajuste ? "Ajustado manualmente" : "Sem ajuste — igual ao saldo"}
+          tone={(ajuste ? ajuste.lucro_liquido : saldoMes) >= 0 ? "ledger" : "crimson"}
+        />
       </div>
+
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={abrirAjusteForm} className="text-xs font-medium text-ledger-dark hover:underline">
+          {ajuste ? "Editar lucro líquido real" : "Definir lucro líquido real deste mês"}
+        </button>
+        {ajuste && (
+          <button onClick={removerAjuste} className="text-xs font-medium text-crimson hover:underline">
+            Remover ajuste
+          </button>
+        )}
+      </div>
+
+      {showAjusteForm && (
+        <form onSubmit={salvarAjuste} className="bg-white rounded-md shadow-sm p-5 mb-4 flex items-end gap-3 flex-wrap">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-muted uppercase tracking-wide mb-1">
+              Lucro líquido real do mês (R$)
+            </label>
+            <input
+              required
+              type="number"
+              step="0.01"
+              placeholder="Ex: 25624.35"
+              value={ajusteValor}
+              onChange={(e) => setAjusteValor(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-md border border-line text-sm font-mono"
+            />
+          </div>
+          <button
+            disabled={savingAjuste}
+            type="submit"
+            className="bg-ledger text-white text-sm font-medium px-4 py-2.5 rounded-md hover:bg-ledger-dark transition-colors disabled:opacity-60"
+          >
+            {savingAjuste ? "Salvando..." : "Salvar ajuste"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAjusteForm(false)}
+            className="text-sm font-medium px-4 py-2.5 rounded-md border border-line text-ink hover:bg-paper transition-colors"
+          >
+            Cancelar
+          </button>
+        </form>
+      )}
 
       <p className="text-xs text-muted mb-4 leading-relaxed">
         Os lançamentos daqui somam/subtraem direto no saldo de Conta Corrente do Painel, mas ficam de fora do
-        Contas a Pagar/Receber e da DRE da Seliga Mídia — pra não misturar as duas operações.
+        Contas a Pagar/Receber e da DRE da Seliga Mídia — pra não misturar as duas operações. O "Lucro líquido
+        real" não altera recebido/pago — é só um valor manual pra registrar o resultado real do mês quando
+        difere do saldo calculado (por acertos internos, por exemplo).
       </p>
 
       {showReceberForm && (
