@@ -88,38 +88,45 @@ export default async function DashboardPage({
       .from("contas_receber")
       .select("valor")
       .eq("status", "recebido")
+      .eq("origem", "seliga_midia")
       .gte("data_recebimento", yearStart)
       .lte("data_recebimento", yearEnd),
     supabase
       .from("contas_pagar")
       .select("valor")
       .eq("status", "pago")
+      .eq("origem", "seliga_midia")
       .gte("data_pagamento", yearStart)
       .lte("data_pagamento", yearEnd),
     supabase
       .from("contas_receber")
       .select("valor")
+      .eq("origem", "seliga_midia")
       .gte("data_vencimento", mesStart)
       .lte("data_vencimento", mesEnd),
     supabase
       .from("contas_receber")
       .select("valor")
       .eq("status", "recebido")
+      .eq("origem", "seliga_midia")
       .gte("data_recebimento", mesStart)
       .lte("data_recebimento", mesEnd),
     supabase
       .from("contas_pagar")
       .select("valor")
       .eq("status", "pago")
+      .eq("origem", "seliga_midia")
       .gte("data_pagamento", mesStart)
       .lte("data_pagamento", mesEnd),
     supabase
       .from("contas_pagar")
       .select("valor")
+      .eq("origem", "seliga_midia")
       .in("status", ["pendente", "atrasado"]),
     supabase
       .from("contas_pagar")
       .select("id, descricao, fornecedor, valor, data_vencimento, status")
+      .eq("origem", "seliga_midia")
       .in("status", ["pendente", "atrasado"])
       .order("data_vencimento", { ascending: true })
       .limit(5),
@@ -127,12 +134,14 @@ export default async function DashboardPage({
       .from("contas_pagar")
       .select("id, descricao, fornecedor, valor, data_vencimento")
       .eq("status", "pendente")
+      .eq("origem", "seliga_midia")
       .lte("data_vencimento", hoje)
       .order("data_vencimento", { ascending: true }),
     supabase
       .from("contas_receber")
       .select("id, descricao, cliente, valor, data_vencimento")
       .eq("status", "pendente")
+      .eq("origem", "seliga_midia")
       .lte("data_vencimento", hoje)
       .order("data_vencimento", { ascending: true }),
   ]);
@@ -155,6 +164,8 @@ export default async function DashboardPage({
     // o valor informado já reflete o saldo no momento exato em que foi salvo
     // (created_at) — então só soma/subtrai o que foi marcado como pago/recebido
     // DEPOIS desse instante, mesmo que no mesmo dia.
+    // Sem filtro de origem de propósito: Projeto JC usa a mesma conta corrente
+    // da Seliga Mídia, então precisa entrar nesse saldo também.
     const [recebidoDesde, pagoDesde] = await Promise.all([
       supabase
         .from("contas_receber")

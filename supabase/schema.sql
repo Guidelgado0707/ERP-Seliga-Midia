@@ -31,6 +31,10 @@ create table contas_pagar (
   forma_pagamento text,
   observacoes text,
   nota_fiscal_url text,
+  -- 'seliga_midia' = operação principal (aparece em Contas a Pagar/DRE/Painel normalmente).
+  -- 'projeto_jc' = operação separada que compartilha a mesma conta corrente (aba Projeto JC;
+  -- entra no saldo do Caixa mas fica fora do Contas a Pagar e da DRE da Seliga Mídia).
+  origem text not null default 'seliga_midia' check (origem in ('seliga_midia', 'projeto_jc')),
   created_at timestamptz not null default now(),
   created_by uuid references auth.users(id) default auth.uid()
 );
@@ -49,6 +53,7 @@ create table contas_receber (
   gera_credito_cliente boolean not null default false,
   observacoes text,
   nota_fiscal_url text,
+  origem text not null default 'seliga_midia' check (origem in ('seliga_midia', 'projeto_jc')),
   created_at timestamptz not null default now(),
   created_by uuid references auth.users(id) default auth.uid()
 );

@@ -47,6 +47,7 @@ export default function ContasAPagarPage() {
       supabase
         .from("contas_pagar")
         .select("*")
+        .eq("origem", "seliga_midia")
         .gte("data_vencimento", start)
         .lte("data_vencimento", end)
         .order("data_vencimento", { ascending: true }),

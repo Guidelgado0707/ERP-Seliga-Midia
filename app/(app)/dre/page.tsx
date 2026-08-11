@@ -196,24 +196,28 @@ export default async function DrePage({
       .from("contas_receber")
       .select("valor, categoria_id")
       .eq("status", "recebido")
+      .eq("origem", "seliga_midia")
       .gte("data_recebimento", yearStart)
       .lte("data_recebimento", yearEnd),
     supabase
       .from("contas_pagar")
       .select("valor, categoria_id")
       .eq("status", "pago")
+      .eq("origem", "seliga_midia")
       .gte("data_pagamento", yearStart)
       .lte("data_pagamento", yearEnd),
     supabase
       .from("contas_receber")
       .select("valor, categoria_id")
       .eq("status", "recebido")
+      .eq("origem", "seliga_midia")
       .gte("data_recebimento", mesStart)
       .lte("data_recebimento", mesEnd),
     supabase
       .from("contas_pagar")
       .select("valor, categoria_id")
       .eq("status", "pago")
+      .eq("origem", "seliga_midia")
       .gte("data_pagamento", mesStart)
       .lte("data_pagamento", mesEnd),
   ]);
