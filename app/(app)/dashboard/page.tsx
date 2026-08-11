@@ -76,6 +76,9 @@ export default async function DashboardPage({
   const [
     anoRecebido,
     anoPago,
+    anoRecebidoJC,
+    anoPagoJC,
+    ajustesJCAno,
     mesProvisionado,
     mesFaturado,
     mesCusto,
@@ -98,6 +101,24 @@ export default async function DashboardPage({
       .eq("origem", "seliga_midia")
       .gte("data_pagamento", yearStart)
       .lte("data_pagamento", yearEnd),
+    supabase
+      .from("contas_receber")
+      .select("valor, data_recebimento")
+      .eq("status", "recebido")
+      .eq("origem", "projeto_jc")
+      .gte("data_recebimento", yearStart)
+      .lte("data_recebimento", yearEnd),
+    supabase
+      .from("contas_pagar")
+      .select("valor, data_pagamento")
+      .eq("status", "pago")
+      .eq("origem", "projeto_jc")
+      .gte("data_pagamento", yearStart)
+      .lte("data_pagamento", yearEnd),
+    supabase
+      .from("projeto_jc_ajustes")
+      .select("mes, lucro_liquido")
+      .like("mes", `${selectedAno}-%`),
     supabase
       .from("contas_receber")
       .select("valor")
@@ -187,9 +208,36 @@ export default async function DashboardPage({
   const sum = (rows: { valor: number }[] | null) =>
     (rows ?? []).reduce((acc, r) => acc + Number(r.valor), 0);
 
-  const faturamentoAno = sum(anoRecebido.data);
-  const custoAno = sum(anoPago.data);
-  const saldoAno = faturamentoAno - custoAno;
+  const faturamentoAnoSeliga = sum(anoRecebido.data);
+  const custoAnoSeliga = sum(anoPago.data);
+
+  // Projeto JC entra na linha do Ano (faturamento/custo/lucro total da operação),
+  // mas continua fora das linhas de mês e da DRE da Seliga Mídia.
+  const somarPorMes = (rows: { valor: number; [key: string]: any }[] | null, campoData: string) => {
+    const totals = new Map<string, number>();
+    for (const r of rows ?? []) {
+      const mesKey = String(r[campoData]).slice(0, 7);
+      totals.set(mesKey, (totals.get(mesKey) ?? 0) + Number(r.valor));
+    }
+    return totals;
+  };
+  const recebidoJCPorMes = somarPorMes(anoRecebidoJC.data, "data_recebimento");
+  const pagoJCPorMes = somarPorMes(anoPagoJC.data, "data_pagamento");
+  const ajustesPorMes = new Map((ajustesJCAno.data ?? []).map((a) => [a.mes, Number(a.lucro_liquido)]));
+
+  const faturamentoJCAno = sum(anoRecebidoJC.data as { valor: number }[]);
+  const custoJCAno = sum(anoPagoJC.data as { valor: number }[]);
+
+  const mesesComJC = new Set([...recebidoJCPorMes.keys(), ...pagoJCPorMes.keys(), ...ajustesPorMes.keys()]);
+  let lucroJCAno = 0;
+  for (const mesKey of mesesComJC) {
+    const ajuste = ajustesPorMes.get(mesKey);
+    lucroJCAno += ajuste !== undefined ? ajuste : (recebidoJCPorMes.get(mesKey) ?? 0) - (pagoJCPorMes.get(mesKey) ?? 0);
+  }
+
+  const faturamentoAno = faturamentoAnoSeliga + faturamentoJCAno;
+  const custoAno = custoAnoSeliga + custoJCAno;
+  const saldoAno = faturamentoAnoSeliga - custoAnoSeliga + lucroJCAno;
 
   const provisionadoMes = sum(mesProvisionado.data);
   const faturamentoMes = sum(mesFaturado.data);
@@ -262,19 +310,19 @@ export default async function DashboardPage({
         <StatCard
           label="Faturamento total do ano"
           value={formatBRL(faturamentoAno)}
-          hint="Tudo que foi recebido no ano"
+          hint="Recebido no ano — Seliga Mídia + Projeto JC"
           tone="ledger"
         />
         <StatCard
           label="Custo total do ano"
           value={formatBRL(custoAno)}
-          hint="Tudo que foi pago no ano"
+          hint="Pago no ano — Seliga Mídia + Projeto JC"
           tone="crimson"
         />
         <StatCard
           label="Lucro líquido ano"
           value={formatBRL(saldoAno)}
-          hint="Faturamento − custo"
+          hint="Seliga Mídia + lucro líquido do Projeto JC (com ajustes manuais, quando houver)"
           tone={saldoAno >= 0 ? "ledger" : "crimson"}
         />
       </div>
