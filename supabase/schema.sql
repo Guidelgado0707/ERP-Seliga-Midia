@@ -100,6 +100,18 @@ create table pro_labore (
   created_by uuid references auth.users(id) default auth.uid()
 );
 
+-- ---------- FATURAS IMPORTADAS (upload + leitura por IA) ----------
+create table faturas_importadas (
+  id uuid primary key default gen_random_uuid(),
+  forma_pagamento text not null,
+  data_pagamento date not null,
+  arquivos text[] not null default '{}',
+  quantidade_itens integer not null default 0,
+  valor_total numeric(12,2) not null default 0,
+  created_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) default auth.uid()
+);
+
 -- ---------- PROJETO JC — ajuste manual de lucro líquido por mês ----------
 -- O saldo (recebido - pago) do mês é calculado automaticamente, mas às vezes o
 -- resultado real difere por acertos internos que não entram como lançamento.
@@ -176,6 +188,7 @@ alter table pro_labore enable row level security;
 alter table propostas enable row level security;
 alter table caixa_referencia enable row level security;
 alter table projeto_jc_ajustes enable row level security;
+alter table faturas_importadas enable row level security;
 
 create policy "authenticated_full_access" on categorias
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -199,6 +212,8 @@ create policy "authenticated_full_access" on caixa_referencia
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "authenticated_full_access" on projeto_jc_ajustes
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "authenticated_full_access" on faturas_importadas
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ============================================================
 -- STORAGE: bucket para as fotos de nota fiscal enviadas pelo celular
@@ -214,6 +229,21 @@ create policy "authenticated_upload_notas" on storage.objects
 create policy "authenticated_read_notas" on storage.objects
   for select to authenticated
   using (bucket_id = 'notas-fiscais');
+
+-- ============================================================
+-- STORAGE: bucket para as fotos/PDFs de fatura de cartão enviadas
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('faturas', 'faturas', false)
+on conflict (id) do nothing;
+
+create policy "authenticated_upload_faturas" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'faturas');
+
+create policy "authenticated_read_faturas" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'faturas');
 
 -- Categorias iniciais sugeridas (edite/complete como quiser)
 insert into categorias (nome, tipo) values

@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/contas-a-receber", label: "A Receber", icon: "↓" },
   { href: "/projeto-jc", label: "Projeto JC", icon: "⊙" },
   { href: "/notas", label: "Notas", icon: "▤" },
+  { href: "/faturas", label: "Faturas", icon: "✨" },
   { href: "/socios", label: "Sócios", icon: "◍" },
   { href: "/propostas", label: "Propostas", icon: "◈" },
 ];
