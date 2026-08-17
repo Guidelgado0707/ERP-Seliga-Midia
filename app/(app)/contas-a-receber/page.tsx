@@ -32,6 +32,15 @@ export default function ContasAReceberPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mes, setMes] = useState(currentMonthValue());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    descricao: "",
+    cliente: "",
+    valor: "",
+    data_vencimento: "",
+    gera_credito_cliente: false,
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [form, setForm] = useState({
     descricao: "",
@@ -108,6 +117,38 @@ export default function ContasAReceberPage() {
   async function apagarConta(id: string) {
     if (!confirm("Tem certeza que deseja apagar esta conta? Essa ação não pode ser desfeita.")) return;
     await supabase.from("contas_receber").delete().eq("id", id);
+    load();
+  }
+
+  function iniciarEdicao(c: Conta) {
+    setEditingId(c.id);
+    setEditForm({
+      descricao: c.descricao,
+      cliente: c.cliente,
+      valor: String(c.valor),
+      data_vencimento: c.data_vencimento,
+      gera_credito_cliente: c.gera_credito_cliente,
+    });
+  }
+
+  function cancelarEdicao() {
+    setEditingId(null);
+  }
+
+  async function salvarEdicao(id: string) {
+    setSavingEdit(true);
+    await supabase
+      .from("contas_receber")
+      .update({
+        descricao: editForm.descricao,
+        cliente: editForm.cliente,
+        valor: Number(editForm.valor),
+        data_vencimento: editForm.data_vencimento,
+        gera_credito_cliente: editForm.gera_credito_cliente,
+      })
+      .eq("id", id);
+    setSavingEdit(false);
+    setEditingId(null);
     load();
   }
 
@@ -275,62 +316,123 @@ export default function ContasAReceberPage() {
           <p className="px-5 py-6 text-sm text-muted">Nenhuma conta cadastrada ainda.</p>
         )}
         <div className="divide-y divide-line">
-          {contas.map((c) => (
-            <div key={c.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-ink truncate">
-                  {c.descricao}
-                  {c.gera_credito_cliente && (
-                    <span className="ml-2 text-[10px] font-medium text-ledger-dark bg-ledger-soft px-1.5 py-0.5 rounded">
-                      GERA CRÉDITO
-                    </span>
+          {contas.map((c) =>
+            editingId === c.id ? (
+              <div key={c.id} className="px-5 py-4 bg-paper grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                <input
+                  value={editForm.descricao}
+                  onChange={(e) => setEditForm({ ...editForm, descricao: e.target.value })}
+                  placeholder="Descrição"
+                  className="px-3 py-2 rounded-md border border-line text-sm md:col-span-2"
+                />
+                <input
+                  value={editForm.cliente}
+                  onChange={(e) => setEditForm({ ...editForm, cliente: e.target.value })}
+                  placeholder="Cliente"
+                  className="px-3 py-2 rounded-md border border-line text-sm"
+                />
+                <input
+                  value={editForm.valor}
+                  onChange={(e) => setEditForm({ ...editForm, valor: e.target.value })}
+                  type="number"
+                  step="0.01"
+                  placeholder="Valor (R$)"
+                  className="px-3 py-2 rounded-md border border-line text-sm font-mono"
+                />
+                <input
+                  value={editForm.data_vencimento}
+                  onChange={(e) => setEditForm({ ...editForm, data_vencimento: e.target.value })}
+                  type="date"
+                  className="px-3 py-2 rounded-md border border-line text-sm"
+                />
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={editForm.gera_credito_cliente}
+                    onChange={(e) => setEditForm({ ...editForm, gera_credito_cliente: e.target.checked })}
+                    className="rounded border-line"
+                  />
+                  Gera crédito tributário
+                </label>
+                <div className="flex gap-2 md:col-span-2">
+                  <button
+                    onClick={() => salvarEdicao(c.id)}
+                    disabled={savingEdit}
+                    className="bg-ledger text-white text-xs font-medium px-3 py-2 rounded-md hover:bg-ledger-dark transition-colors disabled:opacity-60"
+                  >
+                    {savingEdit ? "Salvando..." : "Salvar correção"}
+                  </button>
+                  <button
+                    onClick={cancelarEdicao}
+                    className="text-xs font-medium px-3 py-2 rounded-md border border-line text-ink hover:bg-white transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div key={c.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-ink truncate">
+                    {c.descricao}
+                    {c.gera_credito_cliente && (
+                      <span className="ml-2 text-[10px] font-medium text-ledger-dark bg-ledger-soft px-1.5 py-0.5 rounded">
+                        GERA CRÉDITO
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {c.cliente} · vence em{" "}
+                    {new Date(c.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <select
+                    value={c.categoria_id ?? ""}
+                    onChange={(e) => atualizarCategoria(c.id, e.target.value)}
+                    className="text-xs px-2 py-1.5 rounded-md border border-line bg-white text-muted max-w-[140px]"
+                  >
+                    <option value="">Sem categoria</option>
+                    {categorias.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.nome}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(c.valor))}</span>
+                  <StatusBadge status={c.status} />
+                  {c.status !== "recebido" ? (
+                    <button
+                      onClick={() => marcarComoRecebido(c.id)}
+                      className="text-xs font-medium text-ledger-dark hover:underline"
+                    >
+                      Marcar recebido
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => desfazerRecebimento(c.id)}
+                      className="text-xs font-medium text-amber hover:underline"
+                    >
+                      Desfazer
+                    </button>
                   )}
-                </p>
-                <p className="text-xs text-muted">
-                  {c.cliente} · vence em{" "}
-                  {new Date(c.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <select
-                  value={c.categoria_id ?? ""}
-                  onChange={(e) => atualizarCategoria(c.id, e.target.value)}
-                  className="text-xs px-2 py-1.5 rounded-md border border-line bg-white text-muted max-w-[140px]"
-                >
-                  <option value="">Sem categoria</option>
-                  {categorias.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nome}
-                    </option>
-                  ))}
-                </select>
-                <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(c.valor))}</span>
-                <StatusBadge status={c.status} />
-                {c.status !== "recebido" ? (
                   <button
-                    onClick={() => marcarComoRecebido(c.id)}
-                    className="text-xs font-medium text-ledger-dark hover:underline"
+                    onClick={() => iniciarEdicao(c)}
+                    className="text-xs font-medium text-ink hover:underline"
                   >
-                    Marcar recebido
+                    Editar
                   </button>
-                ) : (
                   <button
-                    onClick={() => desfazerRecebimento(c.id)}
-                    className="text-xs font-medium text-amber hover:underline"
+                    onClick={() => apagarConta(c.id)}
+                    className="text-xs font-medium text-crimson hover:underline"
+                    title="Apagar conta"
                   >
-                    Desfazer
+                    Apagar
                   </button>
-                )}
-                <button
-                  onClick={() => apagarConta(c.id)}
-                  className="text-xs font-medium text-crimson hover:underline"
-                  title="Apagar conta"
-                >
-                  Apagar
-                </button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          )}
         </div>
       </div>
     </div>
