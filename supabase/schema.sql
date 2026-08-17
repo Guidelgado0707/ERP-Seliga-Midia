@@ -83,7 +83,8 @@ create table dividendos_socios (
   socio_id uuid references socios(id),
   valor numeric(12,2) not null,
   pago boolean not null default false,
-  data_pagamento date
+  data_pagamento date,
+  pago_em timestamptz -- momento exato do pagamento, pra calcular o Caixa certinho (não entra na DRE)
 );
 
 -- ---------- PRÓ-LABORE (retirada dos sócios) ----------

@@ -187,7 +187,7 @@ export default async function DashboardPage({
     // DEPOIS desse instante, mesmo que no mesmo dia.
     // Sem filtro de origem de propósito: Projeto JC usa a mesma conta corrente
     // da Seliga Mídia, então precisa entrar nesse saldo também.
-    const [recebidoDesde, pagoDesde] = await Promise.all([
+    const [recebidoDesde, pagoDesde, dividendosPagosDesde] = await Promise.all([
       supabase
         .from("contas_receber")
         .select("valor")
@@ -198,8 +198,19 @@ export default async function DashboardPage({
         .select("valor")
         .eq("status", "pago")
         .gt("pago_em", refContaCorrente.created_at),
+      // dividendos pagos aos sócios também saem da Conta Corrente, mesmo não sendo
+      // despesa na DRE (distribuição de lucro já apurado, não custo operacional).
+      supabase
+        .from("dividendos_socios")
+        .select("valor")
+        .eq("pago", true)
+        .gt("pago_em", refContaCorrente.created_at),
     ]);
-    saldoContaCorrente = Number(refContaCorrente.valor) + sumLocal(recebidoDesde.data) - sumLocal(pagoDesde.data);
+    saldoContaCorrente =
+      Number(refContaCorrente.valor) +
+      sumLocal(recebidoDesde.data) -
+      sumLocal(pagoDesde.data) -
+      sumLocal(dividendosPagosDesde.data);
   }
 
   // Reserva de emergência fica parada — não some/soma com contas a pagar/receber.

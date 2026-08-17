@@ -10,6 +10,8 @@ type Distribuicao = {
   lucro_distribuivel: number;
   dividendos_socios: { id: string; socio_id: string; valor: number; pago: boolean }[];
 };
+
+type EditandoDividendo = { id: string; valor: string };
 type ProLabore = {
   id: string;
   socio_id: string;
@@ -38,6 +40,7 @@ export default function SociosPage() {
   const [showProLaboreForm, setShowProLaboreForm] = useState(false);
 
   const [saving, setSaving] = useState(false);
+  const [editandoDividendo, setEditandoDividendo] = useState<EditandoDividendo | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,11 +143,43 @@ export default function SociosPage() {
     load();
   }
 
-  async function togglePago(id: string, pago: boolean) {
+  async function marcarRecebido(id: string) {
     await supabase
       .from("dividendos_socios")
-      .update({ pago: !pago, data_pagamento: !pago ? new Date().toISOString().slice(0, 10) : null })
+      .update({
+        pago: true,
+        data_pagamento: new Date().toISOString().slice(0, 10),
+        pago_em: new Date().toISOString(),
+      })
       .eq("id", id);
+    load();
+  }
+
+  async function desfazerRecebido(id: string) {
+    await supabase
+      .from("dividendos_socios")
+      .update({ pago: false, data_pagamento: null, pago_em: null })
+      .eq("id", id);
+    load();
+  }
+
+  async function apagarDividendoSocio(id: string) {
+    if (!confirm("Tem certeza que deseja apagar este dividendo? Essa ação não pode ser desfeita.")) return;
+    await supabase.from("dividendos_socios").delete().eq("id", id);
+    load();
+  }
+
+  function iniciarEdicaoDividendo(id: string, valorAtual: number) {
+    setEditandoDividendo({ id, valor: String(valorAtual) });
+  }
+
+  async function salvarEdicaoDividendo() {
+    if (!editandoDividendo) return;
+    await supabase
+      .from("dividendos_socios")
+      .update({ valor: Number(editandoDividendo.valor) })
+      .eq("id", editandoDividendo.id);
+    setEditandoDividendo(null);
     load();
   }
 
@@ -346,18 +381,72 @@ export default function SociosPage() {
               <div className="space-y-1.5">
                 {d.dividendos_socios.map((ds) => {
                   const socio = socios.find((s) => s.id === ds.socio_id);
+
+                  if (editandoDividendo?.id === ds.id) {
+                    return (
+                      <div key={ds.id} className="flex items-center gap-2 text-sm pl-3">
+                        <span className="text-muted flex-1">{socio?.nome ?? "Sócio"}</span>
+                        <input
+                          value={editandoDividendo.valor}
+                          onChange={(e) => setEditandoDividendo({ ...editandoDividendo, valor: e.target.value })}
+                          type="number"
+                          step="0.01"
+                          className="w-28 px-2 py-1 rounded-md border border-line text-sm font-mono"
+                        />
+                        <button
+                          onClick={salvarEdicaoDividendo}
+                          className="text-xs font-medium text-ledger-dark hover:underline"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          onClick={() => setEditandoDividendo(null)}
+                          className="text-xs font-medium text-muted hover:underline"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    );
+                  }
+
                   return (
-                    <div key={ds.id} className="flex items-center justify-between text-sm pl-3">
+                    <div key={ds.id} className="flex items-center justify-between text-sm pl-3 flex-wrap gap-y-1">
                       <span className="text-muted">{socio?.nome ?? "Sócio"}</span>
                       <div className="flex items-center gap-2">
                         <span className="font-mono tabular text-ink">{formatBRL(Number(ds.valor))}</span>
-                        <button
-                          onClick={() => togglePago(ds.id, ds.pago)}
+                        <span
                           className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                             ds.pago ? "bg-ledger-soft text-ledger-dark" : "bg-amber-soft text-amber"
                           }`}
                         >
-                          {ds.pago ? "Pago" : "Pendente"}
+                          {ds.pago ? "Recebido" : "Pendente"}
+                        </span>
+                        {!ds.pago ? (
+                          <button
+                            onClick={() => marcarRecebido(ds.id)}
+                            className="text-xs font-medium text-ledger-dark hover:underline"
+                          >
+                            Marcar recebido
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => desfazerRecebido(ds.id)}
+                            className="text-xs font-medium text-amber hover:underline"
+                          >
+                            Desfazer
+                          </button>
+                        )}
+                        <button
+                          onClick={() => iniciarEdicaoDividendo(ds.id, Number(ds.valor))}
+                          className="text-xs font-medium text-ink hover:underline"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => apagarDividendoSocio(ds.id)}
+                          className="text-xs font-medium text-crimson hover:underline"
+                        >
+                          Apagar
                         </button>
                       </div>
                     </div>
