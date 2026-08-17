@@ -197,6 +197,7 @@ export default async function DrePage({
       .select("valor, categoria_id")
       .eq("status", "recebido")
       .eq("origem", "seliga_midia")
+      .eq("reembolso", false)
       .gte("data_recebimento", yearStart)
       .lte("data_recebimento", yearEnd),
     supabase
@@ -211,6 +212,7 @@ export default async function DrePage({
       .select("valor, categoria_id")
       .eq("status", "recebido")
       .eq("origem", "seliga_midia")
+      .eq("reembolso", false)
       .gte("data_recebimento", mesStart)
       .lte("data_recebimento", mesEnd),
     supabase

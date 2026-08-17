@@ -51,6 +51,9 @@ create table contas_receber (
   recebido_em timestamptz, -- momento exato em que foi marcado como recebido (pra calcular o Caixa certinho)
   status text not null default 'pendente' check (status in ('pendente', 'recebido', 'atrasado', 'cancelado')),
   gera_credito_cliente boolean not null default false,
+  -- dinheiro que entra mas não é faturamento de cliente (ex: reembolso de gasto que caiu no
+  -- cartão da empresa) — conta no Caixa, mas fica fora do Faturamento/DRE.
+  reembolso boolean not null default false,
   observacoes text,
   nota_fiscal_url text,
   origem text not null default 'seliga_midia' check (origem in ('seliga_midia', 'projeto_jc')),

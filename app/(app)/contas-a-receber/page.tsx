@@ -16,6 +16,7 @@ type Conta = {
   status: string;
   gera_credito_cliente: boolean;
   categoria_id: string | null;
+  reembolso: boolean;
 };
 
 type Categoria = { id: string; nome: string };
@@ -39,6 +40,7 @@ export default function ContasAReceberPage() {
     valor: "",
     data_vencimento: "",
     gera_credito_cliente: false,
+    reembolso: false,
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -49,6 +51,7 @@ export default function ContasAReceberPage() {
     data_vencimento: "",
     categoria_id: "",
     gera_credito_cliente: false,
+    reembolso: false,
   });
 
   const load = useCallback(async () => {
@@ -83,8 +86,17 @@ export default function ContasAReceberPage() {
       data_vencimento: form.data_vencimento,
       categoria_id: form.categoria_id || null,
       gera_credito_cliente: form.gera_credito_cliente,
+      reembolso: form.reembolso,
     });
-    setForm({ descricao: "", cliente: "", valor: "", data_vencimento: "", categoria_id: "", gera_credito_cliente: false });
+    setForm({
+      descricao: "",
+      cliente: "",
+      valor: "",
+      data_vencimento: "",
+      categoria_id: "",
+      gera_credito_cliente: false,
+      reembolso: false,
+    });
     setShowForm(false);
     setSaving(false);
     load();
@@ -128,6 +140,7 @@ export default function ContasAReceberPage() {
       valor: String(c.valor),
       data_vencimento: c.data_vencimento,
       gera_credito_cliente: c.gera_credito_cliente,
+      reembolso: c.reembolso,
     });
   }
 
@@ -145,6 +158,7 @@ export default function ContasAReceberPage() {
         valor: Number(editForm.valor),
         data_vencimento: editForm.data_vencimento,
         gera_credito_cliente: editForm.gera_credito_cliente,
+        reembolso: editForm.reembolso,
       })
       .eq("id", id);
     setSavingEdit(false);
@@ -161,14 +175,15 @@ export default function ContasAReceberPage() {
   }
 
   const sum = (rows: Conta[]) => rows.reduce((acc, c) => acc + Number(c.valor), 0);
-  const totalRecebido = sum(contas.filter((c) => c.status === "recebido"));
-  const totalPendente = sum(contas.filter((c) => c.status === "pendente" || c.status === "atrasado"));
-  const totalProvisionado = sum(contas.filter((c) => c.status !== "cancelado"));
+  const contasReceita = contas.filter((c) => !c.reembolso);
+  const totalRecebido = sum(contasReceita.filter((c) => c.status === "recebido"));
+  const totalPendente = sum(contasReceita.filter((c) => c.status === "pendente" || c.status === "atrasado"));
+  const totalProvisionado = sum(contasReceita.filter((c) => c.status !== "cancelado"));
 
   const faturamentoPorCategoria = (() => {
     const nomeMap = new Map(categorias.map((c) => [c.id, c.nome]));
     const totals = new Map<string, number>();
-    for (const c of contas) {
+    for (const c of contasReceita) {
       if (c.status === "cancelado") continue;
       const label = c.categoria_id ? nomeMap.get(c.categoria_id) ?? "Sem categoria" : "Sem categoria";
       totals.set(label, (totals.get(label) ?? 0) + Number(c.valor));
@@ -300,6 +315,15 @@ export default function ContasAReceberPage() {
             />
             Esta nota gera crédito tributário para o cliente
           </label>
+          <label className="flex items-center gap-2 md:col-span-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={form.reembolso}
+              onChange={(e) => setForm({ ...form, reembolso: e.target.checked })}
+              className="rounded border-line"
+            />
+            É reembolso/restituição (não é faturamento — fica fora da DRE e do Faturamento do Painel)
+          </label>
           <button
             disabled={saving}
             type="submit"
@@ -354,6 +378,15 @@ export default function ContasAReceberPage() {
                   />
                   Gera crédito tributário
                 </label>
+                <label className="flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={editForm.reembolso}
+                    onChange={(e) => setEditForm({ ...editForm, reembolso: e.target.checked })}
+                    className="rounded border-line"
+                  />
+                  É reembolso/restituição
+                </label>
                 <div className="flex gap-2 md:col-span-2">
                   <button
                     onClick={() => salvarEdicao(c.id)}
@@ -378,6 +411,11 @@ export default function ContasAReceberPage() {
                     {c.gera_credito_cliente && (
                       <span className="ml-2 text-[10px] font-medium text-ledger-dark bg-ledger-soft px-1.5 py-0.5 rounded">
                         GERA CRÉDITO
+                      </span>
+                    )}
+                    {c.reembolso && (
+                      <span className="ml-2 text-[10px] font-medium text-muted bg-paper border border-line px-1.5 py-0.5 rounded">
+                        REEMBOLSO — NÃO É RECEITA
                       </span>
                     )}
                   </p>
