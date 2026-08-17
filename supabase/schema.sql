@@ -94,7 +94,10 @@ create table pro_labore (
   id uuid primary key default gen_random_uuid(),
   socio_id uuid references socios(id),
   valor numeric(12,2) not null,
-  data_pagamento date not null,
+  data_vencimento date not null, -- quando deve/deveria ser pago
+  data_pagamento date, -- preenchido só quando efetivamente pago
+  pago_em timestamptz, -- momento exato do pagamento, pro cálculo do Caixa
+  status text not null default 'pago' check (status in ('pendente', 'pago')),
   conta_pagar_id uuid references contas_pagar(id),
   observacoes text,
   created_at timestamptz not null default now(),

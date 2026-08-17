@@ -12,11 +12,15 @@ type Distribuicao = {
 };
 
 type EditandoDividendo = { id: string; valor: string };
+type EditandoProLabore = { id: string; valor: string; data_vencimento: string };
 type ProLabore = {
   id: string;
   socio_id: string;
   valor: number;
-  data_pagamento: string;
+  data_vencimento: string;
+  data_pagamento: string | null;
+  status: string;
+  conta_pagar_id: string | null;
 };
 
 function formatBRL(v: number) {
@@ -36,11 +40,12 @@ export default function SociosPage() {
   const [novaDistribuicao, setNovaDistribuicao] = useState({ mes: "", lucro: "" });
   const [showDistForm, setShowDistForm] = useState(false);
 
-  const [novoProLabore, setNovoProLabore] = useState({ socio_id: "", valor: "", data_pagamento: "" });
+  const [novoProLabore, setNovoProLabore] = useState({ socio_id: "", valor: "", data: "", jaPago: true });
   const [showProLaboreForm, setShowProLaboreForm] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [editandoDividendo, setEditandoDividendo] = useState<EditandoDividendo | null>(null);
+  const [editandoProLabore, setEditandoProLabore] = useState<EditandoProLabore | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,8 +57,8 @@ export default function SociosPage() {
         .order("mes_referencia", { ascending: false }),
       supabase
         .from("pro_labore")
-        .select("id, socio_id, valor, data_pagamento")
-        .order("data_pagamento", { ascending: false }),
+        .select("id, socio_id, valor, data_vencimento, data_pagamento, status, conta_pagar_id")
+        .order("data_vencimento", { ascending: false }),
     ]);
     setSocios(s.data ?? []);
     setDistribuicoes((d.data as any) ?? []);
@@ -115,31 +120,109 @@ export default function SociosPage() {
 
     const socio = socios.find((s) => s.id === novoProLabore.socio_id);
     const valorNum = Number(novoProLabore.valor);
-    const data = novoProLabore.data_pagamento || new Date().toISOString().slice(0, 10);
+    const data = novoProLabore.data || new Date().toISOString().slice(0, 10);
+
+    if (novoProLabore.jaPago) {
+      const { data: contaPagar } = await supabase
+        .from("contas_pagar")
+        .insert({
+          descricao: `Pró-labore - ${socio?.nome ?? "Sócio"}`,
+          valor: valorNum,
+          data_vencimento: data,
+          data_pagamento: data,
+          pago_em: new Date().toISOString(),
+          status: "pago",
+        })
+        .select()
+        .single();
+
+      await supabase.from("pro_labore").insert({
+        socio_id: novoProLabore.socio_id,
+        valor: valorNum,
+        data_vencimento: data,
+        data_pagamento: data,
+        pago_em: new Date().toISOString(),
+        status: "pago",
+        conta_pagar_id: contaPagar?.id ?? null,
+      });
+    } else {
+      await supabase.from("pro_labore").insert({
+        socio_id: novoProLabore.socio_id,
+        valor: valorNum,
+        data_vencimento: data,
+        status: "pendente",
+      });
+    }
+
+    setNovoProLabore({ socio_id: "", valor: "", data: "", jaPago: true });
+    setShowProLaboreForm(false);
+    setSaving(false);
+    load();
+  }
+
+  async function marcarProLaborePago(pl: ProLabore) {
+    const socio = socios.find((s) => s.id === pl.socio_id);
+    const hoje = new Date().toISOString().slice(0, 10);
 
     const { data: contaPagar } = await supabase
       .from("contas_pagar")
       .insert({
         descricao: `Pró-labore - ${socio?.nome ?? "Sócio"}`,
-        valor: valorNum,
-        data_vencimento: data,
-        data_pagamento: data,
+        valor: pl.valor,
+        data_vencimento: pl.data_vencimento,
+        data_pagamento: hoje,
         pago_em: new Date().toISOString(),
         status: "pago",
       })
       .select()
       .single();
 
-    await supabase.from("pro_labore").insert({
-      socio_id: novoProLabore.socio_id,
-      valor: valorNum,
-      data_pagamento: data,
-      conta_pagar_id: contaPagar?.id ?? null,
-    });
+    await supabase
+      .from("pro_labore")
+      .update({
+        status: "pago",
+        data_pagamento: hoje,
+        pago_em: new Date().toISOString(),
+        conta_pagar_id: contaPagar?.id ?? null,
+      })
+      .eq("id", pl.id);
+    load();
+  }
 
-    setNovoProLabore({ socio_id: "", valor: "", data_pagamento: "" });
-    setShowProLaboreForm(false);
-    setSaving(false);
+  async function desfazerProLaborePago(pl: ProLabore) {
+    if (pl.conta_pagar_id) {
+      await supabase.from("contas_pagar").delete().eq("id", pl.conta_pagar_id);
+    }
+    await supabase
+      .from("pro_labore")
+      .update({ status: "pendente", data_pagamento: null, pago_em: null, conta_pagar_id: null })
+      .eq("id", pl.id);
+    load();
+  }
+
+  async function apagarProLabore(pl: ProLabore) {
+    if (!confirm("Tem certeza que deseja apagar este pró-labore? Essa ação não pode ser desfeita.")) return;
+    await supabase.from("pro_labore").delete().eq("id", pl.id);
+    if (pl.conta_pagar_id) {
+      await supabase.from("contas_pagar").delete().eq("id", pl.conta_pagar_id);
+    }
+    load();
+  }
+
+  function iniciarEdicaoProLabore(pl: ProLabore) {
+    setEditandoProLabore({ id: pl.id, valor: String(pl.valor), data_vencimento: pl.data_vencimento });
+  }
+
+  async function salvarEdicaoProLabore() {
+    if (!editandoProLabore) return;
+    await supabase
+      .from("pro_labore")
+      .update({
+        valor: Number(editandoProLabore.valor),
+        data_vencimento: editandoProLabore.data_vencimento,
+      })
+      .eq("id", editandoProLabore.id);
+    setEditandoProLabore(null);
     load();
   }
 
@@ -264,65 +347,150 @@ export default function SociosPage() {
         {showProLaboreForm && (
           <form
             onSubmit={handleRegistrarProLabore}
-            className="px-5 py-4 border-b border-line flex flex-col md:flex-row gap-3"
+            className="px-5 py-4 border-b border-line flex flex-col gap-3"
           >
-            <select
-              required
-              value={novoProLabore.socio_id}
-              onChange={(e) => setNovoProLabore({ ...novoProLabore, socio_id: e.target.value })}
-              className="px-3 py-2.5 rounded-md border border-line text-sm"
-            >
-              <option value="">Sócio</option>
-              {socios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
-              ))}
-            </select>
-            <input
-              required
-              type="number"
-              step="0.01"
-              placeholder="Valor (R$)"
-              value={novoProLabore.valor}
-              onChange={(e) => setNovoProLabore({ ...novoProLabore, valor: e.target.value })}
-              className="flex-1 px-3 py-2.5 rounded-md border border-line text-sm font-mono"
-            />
-            <input
-              required
-              type="date"
-              value={novoProLabore.data_pagamento}
-              onChange={(e) => setNovoProLabore({ ...novoProLabore, data_pagamento: e.target.value })}
-              className="px-3 py-2.5 rounded-md border border-line text-sm"
-            />
-            <button
-              disabled={saving}
-              type="submit"
-              className="bg-ledger text-white text-sm font-medium px-4 py-2.5 rounded-md hover:bg-ledger-dark transition-colors disabled:opacity-60"
-            >
-              Registrar
-            </button>
+            <div className="flex flex-col md:flex-row gap-3">
+              <select
+                required
+                value={novoProLabore.socio_id}
+                onChange={(e) => setNovoProLabore({ ...novoProLabore, socio_id: e.target.value })}
+                className="px-3 py-2.5 rounded-md border border-line text-sm"
+              >
+                <option value="">Sócio</option>
+                {socios.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nome}
+                  </option>
+                ))}
+              </select>
+              <input
+                required
+                type="number"
+                step="0.01"
+                placeholder="Valor (R$)"
+                value={novoProLabore.valor}
+                onChange={(e) => setNovoProLabore({ ...novoProLabore, valor: e.target.value })}
+                className="flex-1 px-3 py-2.5 rounded-md border border-line text-sm font-mono"
+              />
+              <input
+                required
+                type="date"
+                value={novoProLabore.data}
+                onChange={(e) => setNovoProLabore({ ...novoProLabore, data: e.target.value })}
+                className="px-3 py-2.5 rounded-md border border-line text-sm"
+              />
+            </div>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={novoProLabore.jaPago}
+                  onChange={(e) => setNovoProLabore({ ...novoProLabore, jaPago: e.target.checked })}
+                  className="rounded border-line"
+                />
+                Já foi pago (a data acima é a data do pagamento)
+              </label>
+              <button
+                disabled={saving}
+                type="submit"
+                className="bg-ledger text-white text-sm font-medium px-4 py-2.5 rounded-md hover:bg-ledger-dark transition-colors disabled:opacity-60"
+              >
+                {novoProLabore.jaPago ? "Registrar como pago" : "Registrar como pendente"}
+              </button>
+            </div>
           </form>
         )}
 
         <div className="divide-y divide-line">
           {proLabores.map((pl) => {
             const socio = socios.find((s) => s.id === pl.socio_id);
+
+            if (editandoProLabore?.id === pl.id) {
+              return (
+                <div key={pl.id} className="px-5 py-3.5 flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-ink flex-1">{socio?.nome ?? "Sócio"}</span>
+                  <input
+                    value={editandoProLabore.valor}
+                    onChange={(e) => setEditandoProLabore({ ...editandoProLabore, valor: e.target.value })}
+                    type="number"
+                    step="0.01"
+                    className="w-28 px-2 py-1.5 rounded-md border border-line text-sm font-mono"
+                  />
+                  <input
+                    value={editandoProLabore.data_vencimento}
+                    onChange={(e) => setEditandoProLabore({ ...editandoProLabore, data_vencimento: e.target.value })}
+                    type="date"
+                    className="px-2 py-1.5 rounded-md border border-line text-sm"
+                  />
+                  <button
+                    onClick={salvarEdicaoProLabore}
+                    className="text-xs font-medium text-ledger-dark hover:underline"
+                  >
+                    Salvar
+                  </button>
+                  <button
+                    onClick={() => setEditandoProLabore(null)}
+                    className="text-xs font-medium text-muted hover:underline"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              );
+            }
+
             return (
-              <div key={pl.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
+              <div key={pl.id} className="px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap">
                 <div>
                   <p className="text-sm font-medium text-ink">{socio?.nome ?? "Sócio"}</p>
                   <p className="text-xs text-muted">
-                    {new Date(pl.data_pagamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                    {pl.status === "pago" && pl.data_pagamento
+                      ? `Pago em ${new Date(pl.data_pagamento + "T00:00:00").toLocaleDateString("pt-BR")}`
+                      : `Vence em ${new Date(pl.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}`}
                   </p>
                 </div>
-                <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(pl.valor))}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(pl.valor))}</span>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      pl.status === "pago" ? "bg-ledger-soft text-ledger-dark" : "bg-amber-soft text-amber"
+                    }`}
+                  >
+                    {pl.status === "pago" ? "Pago" : "Pendente"}
+                  </span>
+                  {pl.status !== "pago" ? (
+                    <button
+                      onClick={() => marcarProLaborePago(pl)}
+                      className="text-xs font-medium text-ledger-dark hover:underline"
+                    >
+                      Marcar pago
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => desfazerProLaborePago(pl)}
+                      className="text-xs font-medium text-amber hover:underline"
+                    >
+                      Desfazer
+                    </button>
+                  )}
+                  <button
+                    onClick={() => iniciarEdicaoProLabore(pl)}
+                    className="text-xs font-medium text-ink hover:underline"
+                  >
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => apagarProLabore(pl)}
+                    className="text-xs font-medium text-crimson hover:underline"
+                  >
+                    Apagar
+                  </button>
+                </div>
               </div>
             );
           })}
           {!loading && proLabores.length === 0 && (
             <p className="px-5 py-6 text-sm text-muted">
-              Nenhum pró-labore registrado ainda. Cada registro já entra automaticamente no Custo do Mês.
+              Nenhum pró-labore registrado ainda. Quando marcado como pago, entra automaticamente no Custo do Mês.
             </p>
           )}
         </div>
