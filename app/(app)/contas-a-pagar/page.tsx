@@ -33,6 +33,14 @@ export default function ContasAPagarPage() {
   const [saving, setSaving] = useState(false);
   const [mes, setMes] = useState(currentMonthValue());
   const [filtroFormaPagamento, setFiltroFormaPagamento] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    descricao: "",
+    fornecedor: "",
+    valor: "",
+    data_vencimento: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [form, setForm] = useState({
     descricao: "",
@@ -107,6 +115,36 @@ export default function ContasAPagarPage() {
   async function apagarConta(id: string) {
     if (!confirm("Tem certeza que deseja apagar esta conta? Essa ação não pode ser desfeita.")) return;
     await supabase.from("contas_pagar").delete().eq("id", id);
+    load();
+  }
+
+  function iniciarEdicao(c: Conta) {
+    setEditingId(c.id);
+    setEditForm({
+      descricao: c.descricao,
+      fornecedor: c.fornecedor ?? "",
+      valor: String(c.valor),
+      data_vencimento: c.data_vencimento,
+    });
+  }
+
+  function cancelarEdicao() {
+    setEditingId(null);
+  }
+
+  async function salvarEdicao(id: string) {
+    setSavingEdit(true);
+    await supabase
+      .from("contas_pagar")
+      .update({
+        descricao: editForm.descricao,
+        fornecedor: editForm.fornecedor || null,
+        valor: Number(editForm.valor),
+        data_vencimento: editForm.data_vencimento,
+      })
+      .eq("id", id);
+    setSavingEdit(false);
+    setEditingId(null);
     load();
   }
 
@@ -299,62 +337,114 @@ export default function ContasAPagarPage() {
           </p>
         )}
         <div className="divide-y divide-line">
-          {contasFiltradas.map((c) => (
-            <div key={c.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-ink truncate">
-                  {c.descricao}
-                  {c.forma_pagamento && (
-                    <span className="ml-2 text-[10px] font-medium text-muted bg-paper border border-line px-1.5 py-0.5 rounded">
-                      {c.forma_pagamento}
-                    </span>
+          {contasFiltradas.map((c) =>
+            editingId === c.id ? (
+              <div key={c.id} className="px-5 py-4 bg-paper grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                <input
+                  value={editForm.descricao}
+                  onChange={(e) => setEditForm({ ...editForm, descricao: e.target.value })}
+                  placeholder="Descrição"
+                  className="px-3 py-2 rounded-md border border-line text-sm md:col-span-2"
+                />
+                <input
+                  value={editForm.fornecedor}
+                  onChange={(e) => setEditForm({ ...editForm, fornecedor: e.target.value })}
+                  placeholder="Fornecedor"
+                  className="px-3 py-2 rounded-md border border-line text-sm"
+                />
+                <input
+                  value={editForm.valor}
+                  onChange={(e) => setEditForm({ ...editForm, valor: e.target.value })}
+                  type="number"
+                  step="0.01"
+                  placeholder="Valor (R$)"
+                  className="px-3 py-2 rounded-md border border-line text-sm font-mono"
+                />
+                <input
+                  value={editForm.data_vencimento}
+                  onChange={(e) => setEditForm({ ...editForm, data_vencimento: e.target.value })}
+                  type="date"
+                  className="px-3 py-2 rounded-md border border-line text-sm"
+                />
+                <div className="flex gap-2 md:col-span-2">
+                  <button
+                    onClick={() => salvarEdicao(c.id)}
+                    disabled={savingEdit}
+                    className="bg-ledger text-white text-xs font-medium px-3 py-2 rounded-md hover:bg-ledger-dark transition-colors disabled:opacity-60"
+                  >
+                    {savingEdit ? "Salvando..." : "Salvar correção"}
+                  </button>
+                  <button
+                    onClick={cancelarEdicao}
+                    className="text-xs font-medium px-3 py-2 rounded-md border border-line text-ink hover:bg-white transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div key={c.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-ink truncate">
+                    {c.descricao}
+                    {c.forma_pagamento && (
+                      <span className="ml-2 text-[10px] font-medium text-muted bg-paper border border-line px-1.5 py-0.5 rounded">
+                        {c.forma_pagamento}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {c.fornecedor || "—"} · vence em{" "}
+                    {new Date(c.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <select
+                    value={c.categoria_id ?? ""}
+                    onChange={(e) => atualizarCategoria(c.id, e.target.value)}
+                    className="text-xs px-2 py-1.5 rounded-md border border-line bg-white text-muted max-w-[140px]"
+                  >
+                    <option value="">Sem categoria</option>
+                    {categorias.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.nome}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(c.valor))}</span>
+                  <StatusBadge status={c.status} />
+                  {c.status !== "pago" ? (
+                    <button
+                      onClick={() => marcarComoPago(c.id)}
+                      className="text-xs font-medium text-ledger-dark hover:underline"
+                    >
+                      Marcar pago
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => desfazerPagamento(c.id)}
+                      className="text-xs font-medium text-amber hover:underline"
+                    >
+                      Desfazer
+                    </button>
                   )}
-                </p>
-                <p className="text-xs text-muted">
-                  {c.fornecedor || "—"} · vence em{" "}
-                  {new Date(c.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <select
-                  value={c.categoria_id ?? ""}
-                  onChange={(e) => atualizarCategoria(c.id, e.target.value)}
-                  className="text-xs px-2 py-1.5 rounded-md border border-line bg-white text-muted max-w-[140px]"
-                >
-                  <option value="">Sem categoria</option>
-                  {categorias.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nome}
-                    </option>
-                  ))}
-                </select>
-                <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(c.valor))}</span>
-                <StatusBadge status={c.status} />
-                {c.status !== "pago" ? (
                   <button
-                    onClick={() => marcarComoPago(c.id)}
-                    className="text-xs font-medium text-ledger-dark hover:underline"
+                    onClick={() => iniciarEdicao(c)}
+                    className="text-xs font-medium text-ink hover:underline"
                   >
-                    Marcar pago
+                    Editar
                   </button>
-                ) : (
                   <button
-                    onClick={() => desfazerPagamento(c.id)}
-                    className="text-xs font-medium text-amber hover:underline"
+                    onClick={() => apagarConta(c.id)}
+                    className="text-xs font-medium text-crimson hover:underline"
+                    title="Apagar conta"
                   >
-                    Desfazer
+                    Apagar
                   </button>
-                )}
-                <button
-                  onClick={() => apagarConta(c.id)}
-                  className="text-xs font-medium text-crimson hover:underline"
-                  title="Apagar conta"
-                >
-                  Apagar
-                </button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          )}
         </div>
       </div>
 
