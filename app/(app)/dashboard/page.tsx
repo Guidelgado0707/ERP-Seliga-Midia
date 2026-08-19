@@ -4,6 +4,7 @@ import MonthFilter from "@/components/MonthFilter";
 import YearFilter from "@/components/YearFilter";
 import RefreshButton from "@/components/RefreshButton";
 import CaixaCard from "@/components/CaixaCard";
+import ComparativoStat from "@/components/ComparativoStat";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -73,6 +74,9 @@ export default async function DashboardPage({
   const yearEnd = `${selectedAno}-12-31`;
   const hoje = now.toISOString().slice(0, 10);
 
+  // janela de 13 meses (mês atual + 12 pra trás) pra comparativos e mini-tendência
+  const janela13Start = monthRange(selectedMonthYear, selectedMonthIndex - 12).start;
+
   const [
     anoRecebido,
     anoPago,
@@ -86,6 +90,8 @@ export default async function DashboardPage({
     proximosVencimentos,
     lembretePagar,
     lembreteReceber,
+    janelaRecebido,
+    janelaPago,
   ] = await Promise.all([
     supabase
       .from("contas_receber")
@@ -168,6 +174,21 @@ export default async function DashboardPage({
       .eq("origem", "seliga_midia")
       .lte("data_vencimento", hoje)
       .order("data_vencimento", { ascending: true }),
+    supabase
+      .from("contas_receber")
+      .select("valor, data_recebimento")
+      .eq("status", "recebido")
+      .eq("origem", "seliga_midia")
+      .eq("reembolso", false)
+      .gte("data_recebimento", janela13Start)
+      .lte("data_recebimento", mesEnd),
+    supabase
+      .from("contas_pagar")
+      .select("valor, data_pagamento")
+      .eq("status", "pago")
+      .eq("origem", "seliga_midia")
+      .gte("data_pagamento", janela13Start)
+      .lte("data_pagamento", mesEnd),
   ]);
 
   const caixaRefRes = await supabase
@@ -259,6 +280,49 @@ export default async function DashboardPage({
   const saldoMes = faturamentoMes - custoMes;
 
   const totalAPagar = sum(aPagarAberto.data);
+
+  // ---------- Comparativos (mês anterior / mesmo mês ano passado / tendência) ----------
+  function mesKeyOffset(offset: number) {
+    const d = new Date(selectedMonthYear, selectedMonthIndex + offset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  function agruparPorMes(rows: { valor: number }[] | null, campoData: string) {
+    const totals = new Map<string, number>();
+    for (const r of (rows ?? []) as Record<string, unknown>[]) {
+      const key = String(r[campoData]).slice(0, 7);
+      totals.set(key, (totals.get(key) ?? 0) + Number(r.valor));
+    }
+    return totals;
+  }
+  const receitaPorMes = agruparPorMes(janelaRecebido.data, "data_recebimento");
+  const custoPorMes = agruparPorMes(janelaPago.data, "data_pagamento");
+
+  const mesAnteriorKey = mesKeyOffset(-1);
+  const anoPassadoKey = mesKeyOffset(-12);
+
+  function calcularDelta(atual: number, comparado: number | undefined) {
+    if (!comparado) return null;
+    return ((atual - comparado) / comparado) * 100;
+  }
+
+  const tendenciaReceita: number[] = [];
+  const tendenciaCusto: number[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const key = mesKeyOffset(-i);
+    tendenciaReceita.push(receitaPorMes.get(key) ?? 0);
+    tendenciaCusto.push(custoPorMes.get(key) ?? 0);
+  }
+
+  const comparativoFaturamento = {
+    deltaMesAnterior: calcularDelta(faturamentoMes, receitaPorMes.get(mesAnteriorKey)),
+    deltaAnoPassado: calcularDelta(faturamentoMes, receitaPorMes.get(anoPassadoKey)),
+  };
+  const comparativoCusto = {
+    deltaMesAnterior: calcularDelta(custoMes, custoPorMes.get(mesAnteriorKey)),
+    deltaAnoPassado: calcularDelta(custoMes, custoPorMes.get(anoPassadoKey)),
+  };
+  const [anoPassadoY, anoPassadoM] = anoPassadoKey.split("-").map(Number);
+  const labelAnoPassado = monthLabel(anoPassadoY, anoPassadoM - 1);
 
   const contasPagarLembrete = lembretePagar.data ?? [];
   const contasReceberLembrete = lembreteReceber.data ?? [];
@@ -372,6 +436,27 @@ export default async function DashboardPage({
           value={formatBRL(saldoMes)}
           hint="Faturamento − custo"
           tone={saldoMes >= 0 ? "ledger" : "crimson"}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-4">
+        <ComparativoStat
+          label="Faturamento — comparativo"
+          valorAtual={faturamentoMes}
+          deltaMesAnterior={comparativoFaturamento.deltaMesAnterior}
+          deltaAnoPassado={comparativoFaturamento.deltaAnoPassado}
+          labelAnoPassado={labelAnoPassado}
+          tendencia={tendenciaReceita}
+          upIsGood={true}
+        />
+        <ComparativoStat
+          label="Custo — comparativo"
+          valorAtual={custoMes}
+          deltaMesAnterior={comparativoCusto.deltaMesAnterior}
+          deltaAnoPassado={comparativoCusto.deltaAnoPassado}
+          labelAnoPassado={labelAnoPassado}
+          tendencia={tendenciaCusto}
+          upIsGood={false}
         />
       </div>
 
