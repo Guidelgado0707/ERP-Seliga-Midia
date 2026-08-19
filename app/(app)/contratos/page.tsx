@@ -14,6 +14,8 @@ type Contrato = {
   criador: string;
   quantidade_videos: number;
   valor_por_video: number;
+  prazo_tipo: string;
+  prazo_quantidade: number;
   data_contrato: string;
   testemunha1_nome: string;
   testemunha1_cpf: string;
@@ -39,6 +41,8 @@ const FORM_VAZIO = {
   criador: CRIADORES[0].id as string,
   quantidade_videos: "1",
   valor_por_video: "",
+  prazo_tipo: "dias",
+  prazo_quantidade: "7",
   data_contrato: hoje(),
   testemunha1_nome: "",
   testemunha1_cpf: "",
@@ -86,6 +90,8 @@ export default function ContratosPage() {
         criador: form.criador,
         quantidade_videos: Number(form.quantidade_videos),
         valor_por_video: Number(form.valor_por_video),
+        prazo_tipo: form.prazo_tipo,
+        prazo_quantidade: Number(form.prazo_quantidade),
         data_contrato: form.data_contrato,
         testemunha1_nome: form.testemunha1_nome,
         testemunha1_cpf: form.testemunha1_cpf,
@@ -125,6 +131,8 @@ export default function ContratosPage() {
             criador={visualizando.criador}
             quantidade_videos={visualizando.quantidade_videos}
             valor_por_video={Number(visualizando.valor_por_video)}
+            prazo_tipo={visualizando.prazo_tipo}
+            prazo_quantidade={visualizando.prazo_quantidade}
             data_contrato={visualizando.data_contrato}
             testemunha1_nome={visualizando.testemunha1_nome}
             testemunha1_cpf={visualizando.testemunha1_cpf}
@@ -241,6 +249,41 @@ export default function ContratosPage() {
             </p>
           )}
 
+          <div>
+            <label className="block text-xs font-medium text-muted uppercase tracking-wide mb-1">
+              Prazo de entrega
+            </label>
+            <select
+              value={form.prazo_tipo}
+              onChange={(e) => setForm({ ...form, prazo_tipo: e.target.value })}
+              className="w-full px-3 py-2.5 rounded-md border border-line text-sm"
+            >
+              <option value="dias">Dias corridos (contrato pontual)</option>
+              <option value="meses">Meses (contrato recorrente)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted uppercase tracking-wide mb-1">
+              {form.prazo_tipo === "meses" ? "Quantidade de meses" : "Quantidade de dias"}
+            </label>
+            <input
+              required
+              type="number"
+              min="1"
+              value={form.prazo_quantidade}
+              onChange={(e) => setForm({ ...form, prazo_quantidade: e.target.value })}
+              className="w-full px-3 py-2.5 rounded-md border border-line text-sm font-mono"
+            />
+          </div>
+          {form.prazo_tipo === "meses" &&
+            form.quantidade_videos &&
+            form.prazo_quantidade &&
+            Number.isInteger(Number(form.quantidade_videos) / Number(form.prazo_quantidade)) && (
+              <p className="text-xs text-muted md:col-span-2">
+                Cadência: {Number(form.quantidade_videos) / Number(form.prazo_quantidade)} vídeo(s) por mês
+              </p>
+            )}
+
           <p className="text-sm font-medium text-ink md:col-span-2 mt-2">Testemunhas</p>
           <input
             required
@@ -293,7 +336,8 @@ export default function ContratosPage() {
                   <p className="text-sm font-medium text-ink truncate">{c.contratante_razao_social}</p>
                   <p className="text-xs text-muted">
                     {criadorInfo?.nome ?? c.criador} · {c.quantidade_videos}{" "}
-                    {c.quantidade_videos === 1 ? "vídeo" : "vídeos"} ·{" "}
+                    {c.quantidade_videos === 1 ? "vídeo" : "vídeos"} em {c.prazo_quantidade}{" "}
+                    {c.prazo_tipo === "meses" ? (c.prazo_quantidade === 1 ? "mês" : "meses") : "dias"} ·{" "}
                     {formatBRL(Number(c.valor_por_video))}/vídeo ·{" "}
                     {new Date(c.data_contrato + "T00:00:00").toLocaleDateString("pt-BR")}
                   </p>

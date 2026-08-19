@@ -175,6 +175,10 @@ create table contratos (
   criador text not null default 'pedro' check (criador in ('pedro', 'andre', 'lucas')),
   quantidade_videos integer not null default 1,
   valor_por_video numeric(12,2) not null,
+  -- prazo de entrega: 'dias' (contrato pontual, ex: 7 dias corridos) ou
+  -- 'meses' (contrato recorrente, ex: 9 vídeos em 3 meses = cadência de 3/mês)
+  prazo_tipo text not null default 'dias' check (prazo_tipo in ('dias', 'meses')),
+  prazo_quantidade integer not null default 7,
   data_contrato date not null,
   testemunha1_nome text not null,
   testemunha1_cpf text not null,

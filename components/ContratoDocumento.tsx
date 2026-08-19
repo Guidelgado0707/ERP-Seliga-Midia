@@ -19,7 +19,6 @@ const CONTRATADA = {
 };
 
 const BRIEFING_DIAS = 5;
-const PRAZO_ENTREGA_DIAS = 7;
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -52,6 +51,31 @@ function diasLabel(n: number) {
   return extenso ? `${n} (${extenso}) dias` : `${n} dias`;
 }
 
+function mesesLabel(n: number) {
+  const extenso = NUMEROS_EXTENSO[n];
+  const palavra = n === 1 ? "mês" : "meses";
+  return extenso ? `${n} (${extenso}) ${palavra}` : `${n} ${palavra}`;
+}
+
+// texto do prazo de entrega — "dias" (contrato pontual) ou "meses" (contrato
+// recorrente, com cadência de vídeos/mês calculada quando a divisão é exata)
+function prazoEntregaTexto(tipo: string, qtd: number, totalVideos: number) {
+  if (tipo === "meses") {
+    const cadencia = totalVideos / qtd;
+    const cadenciaExata = Number.isInteger(cadencia) && cadencia >= 1;
+    return {
+      curto: mesesLabel(qtd),
+      clausula2: `ao longo de ${mesesLabel(qtd)} a contar da assinatura deste contrato${
+        cadenciaExata ? `, na cadência de ${videoLabel(cadencia)} por mês` : ""
+      }`,
+    };
+  }
+  return {
+    curto: `${diasLabel(qtd)} corridos`,
+    clausula2: `no prazo de ${diasLabel(qtd)} corridos a contar da assinatura deste contrato`,
+  };
+}
+
 export type ContratoDados = {
   contratante_razao_social: string;
   contratante_cnpj: string;
@@ -61,6 +85,8 @@ export type ContratoDados = {
   criador: string;
   quantidade_videos: number;
   valor_por_video: number;
+  prazo_tipo: string; // 'dias' | 'meses'
+  prazo_quantidade: number;
   data_contrato: string;
   testemunha1_nome: string;
   testemunha1_cpf: string;
@@ -101,6 +127,8 @@ export default function ContratoDocumento({
   criador,
   quantidade_videos,
   valor_por_video,
+  prazo_tipo,
+  prazo_quantidade,
   data_contrato,
   testemunha1_nome,
   testemunha1_cpf,
@@ -111,6 +139,8 @@ export default function ContratoDocumento({
   const criadorInfo = CRIADORES.find((c) => c.id === criador) ?? CRIADORES[0];
   const total = n * Number(valor_por_video);
   const plural = n > 1;
+  const prazoQtd = Number(prazo_quantidade) || 7;
+  const prazo = prazoEntregaTexto(prazo_tipo || "dias", prazoQtd, n);
 
   return (
     <div
@@ -165,8 +195,8 @@ export default function ContratoDocumento({
       <ul>
         <Li>
           {videoLabel(n)} no formato Reels/TikTok, com integração natural à marca da Contratante, a ser{" "}
-          {plural ? "entregues" : "entregue"} no prazo de {diasLabel(PRAZO_ENTREGA_DIAS)} corridos a contar da
-          assinatura deste contrato, conforme calendário editorial a ser alinhado entre as partes;
+          {plural ? "entregues" : "entregue"} {prazo.clausula2}, conforme calendário editorial a ser alinhado entre
+          as partes;
         </Li>
         <Li>
           A produção {plural ? "dos vídeos" : "do vídeo"} será realizada de forma colaborativa, envolvendo a
@@ -310,7 +340,7 @@ export default function ContratoDocumento({
       <P>
         Este contrato tem vigência a partir da data de sua assinatura até a efetiva entrega, aprovação e publicação{" "}
         {plural ? "dos vídeos previstos" : "do vídeo previsto"} na Cláusula 2ª, observado o prazo de{" "}
-        {diasLabel(PRAZO_ENTREGA_DIAS)} corridos indicado naquela cláusula.
+        {prazo.curto} indicado naquela cláusula.
       </P>
 
       <ClauseTitle>Cláusula 10ª — Do Foro</ClauseTitle>
