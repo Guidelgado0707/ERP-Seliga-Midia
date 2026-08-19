@@ -5,6 +5,7 @@ import YearFilter from "@/components/YearFilter";
 import RefreshButton from "@/components/RefreshButton";
 import CaixaCard from "@/components/CaixaCard";
 import ComparativoStat from "@/components/ComparativoStat";
+import YearComparativoChart, { type SerieAno } from "@/components/YearComparativoChart";
 
 function formatBRL(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -92,6 +93,8 @@ export default async function DashboardPage({
     lembreteReceber,
     janelaRecebido,
     janelaPago,
+    tresAnosRecebido,
+    tresAnosPago,
   ] = await Promise.all([
     supabase
       .from("contas_receber")
@@ -189,6 +192,21 @@ export default async function DashboardPage({
       .eq("origem", "seliga_midia")
       .gte("data_pagamento", janela13Start)
       .lte("data_pagamento", mesEnd),
+    supabase
+      .from("contas_receber")
+      .select("valor, data_recebimento")
+      .eq("status", "recebido")
+      .eq("origem", "seliga_midia")
+      .eq("reembolso", false)
+      .gte("data_recebimento", `${selectedAno - 2}-01-01`)
+      .lte("data_recebimento", `${selectedAno}-12-31`),
+    supabase
+      .from("contas_pagar")
+      .select("valor, data_pagamento")
+      .eq("status", "pago")
+      .eq("origem", "seliga_midia")
+      .gte("data_pagamento", `${selectedAno - 2}-01-01`)
+      .lte("data_pagamento", `${selectedAno}-12-31`),
   ]);
 
   const caixaRefRes = await supabase
@@ -305,14 +323,6 @@ export default async function DashboardPage({
     return ((atual - comparado) / comparado) * 100;
   }
 
-  const tendenciaReceita: number[] = [];
-  const tendenciaCusto: number[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const key = mesKeyOffset(-i);
-    tendenciaReceita.push(receitaPorMes.get(key) ?? 0);
-    tendenciaCusto.push(custoPorMes.get(key) ?? 0);
-  }
-
   const comparativoFaturamento = {
     deltaMesAnterior: calcularDelta(faturamentoMes, receitaPorMes.get(mesAnteriorKey)),
     deltaAnoPassado: calcularDelta(faturamentoMes, receitaPorMes.get(anoPassadoKey)),
@@ -323,6 +333,28 @@ export default async function DashboardPage({
   };
   const [anoPassadoY, anoPassadoM] = anoPassadoKey.split("-").map(Number);
   const labelAnoPassado = monthLabel(anoPassadoY, anoPassadoM - 1);
+
+  // ---------- Gráfico de 3 anos (Jan-Dez), pra comparar ano contra ano ----------
+  const receitaPorMesTresAnos = agruparPorMes(tresAnosRecebido.data, "data_recebimento");
+  const custoPorMesTresAnos = agruparPorMes(tresAnosPago.data, "data_pagamento");
+  const anosGrafico = [selectedAno - 2, selectedAno - 1, selectedAno];
+
+  function montarSeries(mapa: Map<string, number>): SerieAno[] {
+    return anosGrafico.map((ano) => ({
+      ano,
+      valores: Array.from({ length: 12 }, (_, mesIdx) => {
+        const key = `${ano}-${String(mesIdx + 1).padStart(2, "0")}`;
+        // mês futuro (ainda não chegou) fica null (sem dado); mês passado sem
+        // lançamento nenhum vira 0 de verdade.
+        const noFuturo = ano > now.getFullYear() || (ano === now.getFullYear() && mesIdx > now.getMonth());
+        if (noFuturo) return null;
+        return mapa.get(key) ?? 0;
+      }),
+    }));
+  }
+
+  const serieFaturamento = montarSeries(receitaPorMesTresAnos);
+  const serieCusto = montarSeries(custoPorMesTresAnos);
 
   const contasPagarLembrete = lembretePagar.data ?? [];
   const contasReceberLembrete = lembreteReceber.data ?? [];
@@ -446,7 +478,6 @@ export default async function DashboardPage({
           deltaMesAnterior={comparativoFaturamento.deltaMesAnterior}
           deltaAnoPassado={comparativoFaturamento.deltaAnoPassado}
           labelAnoPassado={labelAnoPassado}
-          tendencia={tendenciaReceita}
           upIsGood={true}
         />
         <ComparativoStat
@@ -455,9 +486,13 @@ export default async function DashboardPage({
           deltaMesAnterior={comparativoCusto.deltaMesAnterior}
           deltaAnoPassado={comparativoCusto.deltaAnoPassado}
           labelAnoPassado={labelAnoPassado}
-          tendencia={tendenciaCusto}
           upIsGood={false}
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 mt-4">
+        <YearComparativoChart titulo={`Faturamento ${anosGrafico.join(" x ")}`} series={serieFaturamento} />
+        <YearComparativoChart titulo={`Custo ${anosGrafico.join(" x ")}`} series={serieCusto} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
