@@ -76,7 +76,7 @@ export default function Nav() {
 
       {/* Mobile: barra inferior fixa. Com 10 abas não cabem todas na tela, então
           rola horizontalmente (arrastando) em vez de cortar as últimas fora de vista */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-line relative">
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-line">
         <nav
           ref={mobileNavRef}
           className="flex overflow-x-auto no-scrollbar px-1 py-2 scroll-smooth"
