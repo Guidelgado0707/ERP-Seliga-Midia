@@ -36,12 +36,13 @@ export default function YearComparativoChart({
   const w = 720;
   const h = 320;
   const padL = 56;
-  const padR = 16;
+  const padR = 46;
   const padT = 16;
   const padB = 28;
   const plotW = w - padL - padR;
   const plotH = h - padT - padB;
 
+  const anoMaisRecente = Math.max(...series.map((s) => s.ano));
   const todosValores = series.flatMap((s) => s.valores).filter((v): v is number => v !== null);
   const max = Math.max(...todosValores, 1);
   const niceMax = Math.ceil(max / 20000) * 20000 || 20000;
@@ -156,10 +157,13 @@ export default function YearComparativoChart({
                   strokeWidth={2}
                 />
               ))}
-              {ultimo && (
+              {/* só o ano mais recente leva rótulo direto — os anos completos (até dez)
+                  disputariam o mesmo canto e colidiriam; ficam no hover + legenda */}
+              {ultimo && s.ano === anoMaisRecente && (
                 <text
-                  x={x(ultimo.i) + 6}
+                  x={Math.min(x(ultimo.i) + 6, w - 4)}
                   y={y(ultimo.v) + 4}
+                  textAnchor={ultimo.i === 11 ? "end" : "start"}
                   fontSize="10.5"
                   fontWeight={600}
                   fill={cor}
