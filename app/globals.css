@@ -48,3 +48,20 @@
     margin: 0;
   }
 }
+
+/* Impressão de contrato: mesmo truque, mas o documento pode ter várias páginas */
+@media print {
+  body:has(#contrato-print-area) * {
+    visibility: hidden;
+  }
+  body:has(#contrato-print-area) #contrato-print-area,
+  body:has(#contrato-print-area) #contrato-print-area * {
+    visibility: visible;
+  }
+  #contrato-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}

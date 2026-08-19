@@ -162,6 +162,28 @@ create table propostas (
   created_by uuid references auth.users(id) default auth.uid()
 );
 
+-- ---------- CONTRATOS DE PARCERIA COMERCIAL (contrato pontual, vídeo único ou N vídeos) ----------
+-- Contratada é sempre a Seliga Mídia LTDA (dados fixos no componente do documento);
+-- "criador" só define qual perfil/criador aparece vinculado ao contrato.
+create table contratos (
+  id uuid primary key default gen_random_uuid(),
+  contratante_razao_social text not null,
+  contratante_cnpj text not null,
+  contratante_endereco text not null,
+  contratante_representante text not null,
+  contratante_email text not null,
+  criador text not null default 'pedro' check (criador in ('pedro', 'andre', 'lucas')),
+  quantidade_videos integer not null default 1,
+  valor_por_video numeric(12,2) not null,
+  data_contrato date not null,
+  testemunha1_nome text not null,
+  testemunha1_cpf text not null,
+  testemunha2_nome text,
+  testemunha2_cpf text,
+  created_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) default auth.uid()
+);
+
 -- ---------- NOTAS FISCAIS / RECIBOS AVULSOS (upload pelo celular) ----------
 -- Usada pro fluxo "tirei foto da nota do almoço e joguei no app"
 create table notas_fiscais (
@@ -193,6 +215,7 @@ alter table dividendos_socios enable row level security;
 alter table notas_fiscais enable row level security;
 alter table pro_labore enable row level security;
 alter table propostas enable row level security;
+alter table contratos enable row level security;
 alter table caixa_referencia enable row level security;
 alter table projeto_jc_ajustes enable row level security;
 alter table faturas_importadas enable row level security;
@@ -214,6 +237,8 @@ create policy "authenticated_full_access" on notas_fiscais
 create policy "authenticated_full_access" on pro_labore
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "authenticated_full_access" on propostas
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "authenticated_full_access" on contratos
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "authenticated_full_access" on caixa_referencia
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
