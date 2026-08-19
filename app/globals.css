@@ -15,6 +15,16 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+
+  /* esconde a barra de rolagem mas mantém o arrastar funcionando (usado na nav mobile,
+     que tem mais abas do que cabem numa tela de celular) */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* barra de status lateral usada nos cards de conta (o "elemento assinatura" do ERP) */

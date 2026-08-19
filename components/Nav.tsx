@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabaseClient";
 
 const ITEMS = [
@@ -21,12 +22,20 @@ export default function Nav() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const mobileNavRef = useRef<HTMLElement>(null);
+  const activeItemRef = useRef<HTMLAnchorElement>(null);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
   }
+
+  // garante que a aba ativa fique visível dentro da barra rolável (ex: ao navegar
+  // direto para "Contratos", que sem isso ficaria fora da área visível inicial)
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [pathname]);
 
   return (
     <>
@@ -65,24 +74,34 @@ export default function Nav() {
         </div>
       </aside>
 
-      {/* Mobile: barra inferior fixa, fácil de usar com o polegar */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-line flex justify-around py-2 z-50">
-        {ITEMS.map((item) => {
-          const active = pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-md text-[11px] font-medium ${
-                active ? "text-ledger-dark" : "text-muted"
-              }`}
-            >
-              <span className="text-base leading-none">{item.icon}</span>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Mobile: barra inferior fixa. Com 10 abas não cabem todas na tela, então
+          rola horizontalmente (arrastando) em vez de cortar as últimas fora de vista */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-line relative">
+        <nav
+          ref={mobileNavRef}
+          className="flex overflow-x-auto no-scrollbar px-1 py-2 scroll-smooth"
+        >
+          {ITEMS.map((item) => {
+            const active = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                ref={active ? activeItemRef : undefined}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md text-[11px] font-medium shrink-0 ${
+                  active ? "text-ledger-dark" : "text-muted"
+                }`}
+              >
+                <span className="text-base leading-none">{item.icon}</span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        {/* fades nas bordas: sinalizam que dá pra arrastar pra ver as outras abas */}
+        <div className="absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-white to-transparent pointer-events-none" />
+        <div className="absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-white to-transparent pointer-events-none" />
+      </div>
     </>
   );
 }
