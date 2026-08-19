@@ -13,6 +13,7 @@ const ITEMS = [
   { href: "/projeto-jc", label: "Projeto JC", icon: "⊙" },
   { href: "/notas", label: "Notas", icon: "▤" },
   { href: "/faturas", label: "Faturas", icon: "✨" },
+  { href: "/videos", label: "Vídeos", icon: "▶" },
   { href: "/socios", label: "Sócios", icon: "◍" },
   { href: "/propostas", label: "Propostas", icon: "◈" },
   { href: "/contratos", label: "Contratos", icon: "▧" },

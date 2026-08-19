@@ -188,6 +188,17 @@ create table contratos (
   created_by uuid references auth.users(id) default auth.uid()
 );
 
+-- ---------- VÍDEOS (agenda de edição/entrega — espelha a planilha "AGENDA DE EDIÇÃO") ----------
+create table videos (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  cliente text not null,
+  status text not null default 'editado' check (status in ('editado', 'nao_editado')),
+  data date not null,
+  created_at timestamptz not null default now(),
+  created_by uuid references auth.users(id) default auth.uid()
+);
+
 -- ---------- NOTAS FISCAIS / RECIBOS AVULSOS (upload pelo celular) ----------
 -- Usada pro fluxo "tirei foto da nota do almoço e joguei no app"
 create table notas_fiscais (
@@ -223,6 +234,7 @@ alter table contratos enable row level security;
 alter table caixa_referencia enable row level security;
 alter table projeto_jc_ajustes enable row level security;
 alter table faturas_importadas enable row level security;
+alter table videos enable row level security;
 
 create policy "authenticated_full_access" on categorias
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
@@ -249,6 +261,8 @@ create policy "authenticated_full_access" on caixa_referencia
 create policy "authenticated_full_access" on projeto_jc_ajustes
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "authenticated_full_access" on faturas_importadas
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "authenticated_full_access" on videos
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- ============================================================

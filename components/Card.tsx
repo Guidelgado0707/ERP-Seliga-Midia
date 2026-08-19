@@ -34,6 +34,8 @@ export function StatusBadge({ status }: { status: string }) {
     pendente_categorizacao: "bg-amber-soft text-amber",
     vinculada: "bg-ledger-soft text-ledger-dark",
     ignorada: "bg-line text-muted",
+    editado: "bg-ledger-soft text-ledger-dark",
+    nao_editado: "bg-amber-soft text-amber",
   };
   const labels: Record<string, string> = {
     pendente: "Pendente",
@@ -44,6 +46,8 @@ export function StatusBadge({ status }: { status: string }) {
     pendente_categorizacao: "Pendente",
     vinculada: "Vinculada",
     ignorada: "Ignorada",
+    editado: "Editado",
+    nao_editado: "Não editado",
   };
   return (
     <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${map[status] ?? "bg-line text-muted"}`}>
