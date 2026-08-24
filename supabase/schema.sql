@@ -194,6 +194,9 @@ create table videos (
   nome text not null,
   cliente text not null,
   status text not null default 'editado' check (status in ('editado', 'nao_editado')),
+  -- controle independente do status de edição: já foi gravado nas ruas/estúdio?
+  -- (fluxo real é gravado -> editado, mas as duas marcações são manuais e soltas)
+  gravado boolean not null default false,
   data date not null,
   created_at timestamptz not null default now(),
   created_by uuid references auth.users(id) default auth.uid()

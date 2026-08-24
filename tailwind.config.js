@@ -24,6 +24,10 @@ module.exports = {
           DEFAULT: "#B3261E",
           soft: "#F7E3E1",
         },
+        purple: {
+          DEFAULT: "#6D4AFF",
+          soft: "#ECE7FF",
+        },
       },
       fontFamily: {
         display: ["var(--font-display)", "sans-serif"],

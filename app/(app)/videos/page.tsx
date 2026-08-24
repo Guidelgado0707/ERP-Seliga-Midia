@@ -10,6 +10,7 @@ type Video = {
   nome: string;
   cliente: string;
   status: string;
+  gravado: boolean;
   data: string;
 };
 
@@ -34,6 +35,7 @@ export default function VideosPage() {
     nome: "",
     cliente: "",
     status: "editado",
+    gravado: false,
     data: new Date().toISOString().slice(0, 10),
   });
 
@@ -75,9 +77,10 @@ export default function VideosPage() {
       nome: form.nome,
       cliente: form.cliente,
       status: form.status,
+      gravado: form.gravado,
       data: form.data,
     });
-    setForm({ nome: "", cliente: "", status: "editado", data: new Date().toISOString().slice(0, 10) });
+    setForm({ nome: "", cliente: "", status: "editado", gravado: false, data: new Date().toISOString().slice(0, 10) });
     setShowForm(false);
     setSaving(false);
     load();
@@ -87,6 +90,12 @@ export default function VideosPage() {
     const novo = v.status === "editado" ? "nao_editado" : "editado";
     setVideosAno((vs) => vs.map((x) => (x.id === v.id ? { ...x, status: novo } : x)));
     await supabase.from("videos").update({ status: novo }).eq("id", v.id);
+  }
+
+  async function alternarGravado(v: Video) {
+    const novo = !v.gravado;
+    setVideosAno((vs) => vs.map((x) => (x.id === v.id ? { ...x, gravado: novo } : x)));
+    await supabase.from("videos").update({ gravado: novo }).eq("id", v.id);
   }
 
   async function apagarVideo(id: string) {
@@ -208,10 +217,14 @@ export default function VideosPage() {
             <div>
               <p className="text-sm font-medium text-ink">Resumo por cliente</p>
               <p className="text-xs text-muted mt-0.5">
-                Clique numa bolinha pra marcar editado/não editado, ou no nome do cliente pra filtrar a lista
+                Clique numa bolinha pra marcar gravado/editado, ou no nome do cliente pra filtrar a lista
               </p>
             </div>
-            <div className="flex items-center gap-3 text-xs text-muted shrink-0">
+            <div className="flex items-center gap-3 text-xs text-muted shrink-0 flex-wrap">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-purple" />
+                Gravado
+              </span>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block w-2.5 h-2.5 rounded-full bg-ledger" />
                 Editado
@@ -235,16 +248,24 @@ export default function VideosPage() {
                 >
                   {r.cliente}
                 </button>
-                <div className="flex-1 flex flex-wrap gap-1.5 items-center py-0.5">
+                <div className="flex-1 flex flex-wrap gap-x-3 gap-y-1.5 items-center py-0.5">
                   {r.videos.map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => alternarStatus(v)}
-                      title={`${v.nome} — ${v.status === "editado" ? "editado" : "não editado"} (clique pra alternar)`}
-                      className={`w-3.5 h-3.5 rounded-full shrink-0 transition-transform hover:scale-125 ${
-                        v.status === "editado" ? "bg-ledger" : "bg-amber"
-                      }`}
-                    />
+                    <div key={v.id} className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => alternarGravado(v)}
+                        title={`${v.nome} — ${v.gravado ? "gravado" : "não gravado"} (clique pra alternar)`}
+                        className={`w-3.5 h-3.5 rounded-full shrink-0 transition-transform hover:scale-125 ${
+                          v.gravado ? "bg-purple" : "bg-line"
+                        }`}
+                      />
+                      <button
+                        onClick={() => alternarStatus(v)}
+                        title={`${v.nome} — ${v.status === "editado" ? "editado" : "não editado"} (clique pra alternar)`}
+                        className={`w-3.5 h-3.5 rounded-full shrink-0 transition-transform hover:scale-125 ${
+                          v.status === "editado" ? "bg-ledger" : "bg-amber"
+                        }`}
+                      />
+                    </div>
                   ))}
                 </div>
                 <span className="text-xs font-mono tabular text-muted shrink-0 w-14 text-right">
@@ -287,6 +308,15 @@ export default function VideosPage() {
             onChange={(e) => setForm({ ...form, data: e.target.value })}
             className="px-3 py-2.5 rounded-md border border-line text-sm md:col-span-2"
           />
+          <label className="flex items-center gap-2 px-3 py-2.5 rounded-md border border-line text-sm text-ink md:col-span-2">
+            <input
+              type="checkbox"
+              checked={form.gravado}
+              onChange={(e) => setForm({ ...form, gravado: e.target.checked })}
+              className="accent-purple w-4 h-4"
+            />
+            Já foi gravado
+          </label>
           <button
             disabled={saving}
             type="submit"
@@ -351,6 +381,19 @@ export default function VideosPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                  <span
+                    className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
+                      v.gravado ? "bg-purple-soft text-purple" : "bg-line text-muted"
+                    }`}
+                  >
+                    {v.gravado ? "Gravado" : "Não gravado"}
+                  </span>
+                  <button
+                    onClick={() => alternarGravado(v)}
+                    className="text-xs font-medium text-purple hover:underline"
+                  >
+                    {v.gravado ? "Desmarcar" : "Marcar gravado"}
+                  </button>
                   <StatusBadge status={v.status} />
                   <button
                     onClick={() => alternarStatus(v)}
