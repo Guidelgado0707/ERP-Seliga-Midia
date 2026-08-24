@@ -383,7 +383,7 @@ export default function ContasAPagarPage() {
                 </div>
               </div>
             ) : (
-              <div key={c.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
+              <div key={c.id} className="px-5 py-3.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-ink truncate">
                     {c.descricao}
@@ -398,7 +398,7 @@ export default function ContasAPagarPage() {
                     {new Date(c.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
                   </p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-3 flex-wrap sm:shrink-0">
                   <select
                     value={c.categoria_id ?? ""}
                     onChange={(e) => atualizarCategoria(c.id, e.target.value)}

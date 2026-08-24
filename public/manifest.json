@@ -1,0 +1,23 @@
+{
+  "name": "Gestão Seliga Mídia",
+  "short_name": "Seliga Mídia",
+  "description": "Gestão financeira da agência — contas a pagar, a receber e dividendos",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#F6F7F5",
+  "theme_color": "#0F6B5C",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

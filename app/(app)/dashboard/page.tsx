@@ -519,7 +519,7 @@ export default async function DashboardPage({
             <p className="px-5 py-6 text-sm text-muted">Nenhuma conta a pagar pendente. 🎉</p>
           )}
           {(proximosVencimentos.data ?? []).map((c) => (
-            <div key={c.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
+            <div key={c.id} className="px-5 py-3.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink truncate">{c.descricao}</p>
                 <p className="text-xs text-muted">
@@ -527,7 +527,7 @@ export default async function DashboardPage({
                   {new Date(c.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
                 </p>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-3 flex-wrap sm:shrink-0">
                 <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(c.valor))}</span>
                 <StatusBadge status={c.status} />
               </div>

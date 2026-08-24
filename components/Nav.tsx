@@ -53,6 +53,7 @@ export default function Nav() {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
                   active
                     ? "bg-ledger-soft text-ledger-dark"
@@ -88,6 +89,7 @@ export default function Nav() {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 ref={active ? activeItemRef : undefined}
                 className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-md text-[11px] font-medium shrink-0 ${
                   active ? "text-ledger-dark" : "text-muted"

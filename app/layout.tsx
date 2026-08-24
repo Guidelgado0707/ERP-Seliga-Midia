@@ -23,6 +23,7 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Gestão Seliga Mídia",
   description: "Gestão financeira da agência — contas a pagar, a receber e dividendos",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
