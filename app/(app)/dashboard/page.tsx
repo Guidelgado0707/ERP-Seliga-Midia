@@ -95,6 +95,7 @@ export default async function DashboardPage({
     janelaPago,
     tresAnosRecebido,
     tresAnosPago,
+    caixaRefRes,
   ] = await Promise.all([
     supabase
       .from("contas_receber")
@@ -207,13 +208,14 @@ export default async function DashboardPage({
       .eq("origem", "seliga_midia")
       .gte("data_pagamento", `${selectedAno - 2}-01-01`)
       .lte("data_pagamento", `${selectedAno}-12-31`),
+    // não depende de nada acima — junto no mesmo Promise.all pra poupar uma
+    // viagem de rede a mais (antes rodava sequencialmente depois deste bloco)
+    supabase
+      .from("caixa_referencia")
+      .select("conta, data_referencia, valor, created_at")
+      .order("data_referencia", { ascending: false })
+      .order("created_at", { ascending: false }),
   ]);
-
-  const caixaRefRes = await supabase
-    .from("caixa_referencia")
-    .select("conta, data_referencia, valor, created_at")
-    .order("data_referencia", { ascending: false })
-    .order("created_at", { ascending: false });
 
   const todasReferencias = caixaRefRes.data ?? [];
   const refContaCorrente = todasReferencias.find((r) => r.conta === "Conta Corrente") ?? null;
