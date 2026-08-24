@@ -175,6 +175,14 @@ export default function VideosPage() {
             </select>
           )}
           <button
+            onClick={() => load()}
+            disabled={loading}
+            className="text-sm font-medium px-3 py-2 rounded-md border border-line text-ink hover:bg-white transition-colors disabled:opacity-60 flex items-center gap-1.5"
+          >
+            <span className={loading ? "inline-block animate-spin" : "inline-block"}>↻</span>
+            {loading ? "Atualizando..." : "Atualizar"}
+          </button>
+          <button
             onClick={() => setShowForm((s) => !s)}
             className="text-sm font-medium px-3 py-2 rounded-md bg-ledger text-white hover:bg-ledger-dark transition-colors"
           >
