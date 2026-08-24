@@ -126,20 +126,20 @@ export default function VideosPage() {
   const valorMedioVideo = qtdMes > 0 ? faturamentoMes / qtdMes : 0;
 
   // resumo por cliente do mês — mesma ideia do quadro físico do escritório:
-  // uma barra por cliente comparando quantos vídeos já foram editados vs. o total
+  // uma bolinha por vídeo, colorida conforme o status (clicável pra alternar)
   const resumoPorCliente = (() => {
-    const porCliente = new Map<string, { editado: number; naoEditado: number }>();
+    const porCliente = new Map<string, Video[]>();
     for (const v of videosMes) {
-      const atual = porCliente.get(v.cliente) ?? { editado: 0, naoEditado: 0 };
-      if (v.status === "editado") atual.editado += 1;
-      else atual.naoEditado += 1;
+      const atual = porCliente.get(v.cliente) ?? [];
+      atual.push(v);
       porCliente.set(v.cliente, atual);
     }
-    return Array.from(porCliente, ([cliente, c]) => ({ cliente, ...c, total: c.editado + c.naoEditado })).sort(
-      (a, b) => b.total - a.total
-    );
+    return Array.from(porCliente, ([cliente, videos]) => {
+      const ordenados = [...videos].sort((a, b) => a.data.localeCompare(b.data));
+      const editado = ordenados.filter((v) => v.status === "editado").length;
+      return { cliente, videos: ordenados, editado, total: ordenados.length };
+    }).sort((a, b) => b.total - a.total);
   })();
-  const maiorTotalCliente = Math.max(...resumoPorCliente.map((r) => r.total), 1);
 
   return (
     <div>
@@ -207,7 +207,9 @@ export default function VideosPage() {
           <div className="px-5 py-4 border-b border-line flex items-center justify-between flex-wrap gap-2">
             <div>
               <p className="text-sm font-medium text-ink">Resumo por cliente</p>
-              <p className="text-xs text-muted mt-0.5">Editados x pendentes no mês — clique num cliente pra filtrar a lista</p>
+              <p className="text-xs text-muted mt-0.5">
+                Clique numa bolinha pra marcar editado/não editado, ou no nome do cliente pra filtrar a lista
+              </p>
             </div>
             <div className="flex items-center gap-3 text-xs text-muted shrink-0">
               <span className="flex items-center gap-1.5">
@@ -222,34 +224,33 @@ export default function VideosPage() {
           </div>
           <div className="divide-y divide-line">
             {resumoPorCliente.map((r) => (
-              <button
+              <div
                 key={r.cliente}
-                onClick={() => setFiltroCliente((atual) => (atual === r.cliente ? "" : r.cliente))}
-                className={`w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-paper transition-colors ${
-                  filtroCliente === r.cliente ? "bg-paper" : ""
-                }`}
+                className={`flex items-center gap-3 px-5 py-2.5 ${filtroCliente === r.cliente ? "bg-paper" : ""}`}
               >
-                <span className="text-sm text-ink w-32 md:w-40 shrink-0 truncate" title={r.cliente}>
+                <button
+                  onClick={() => setFiltroCliente((atual) => (atual === r.cliente ? "" : r.cliente))}
+                  className="text-sm text-ink w-28 md:w-36 shrink-0 truncate text-left hover:underline"
+                  title={`${r.cliente} — clique pra filtrar a lista`}
+                >
                   {r.cliente}
-                </span>
-                <span className="flex-1 h-3 rounded-full bg-paper overflow-hidden">
-                  <span
-                    className="flex h-full rounded-full overflow-hidden"
-                    style={{ width: `${(r.total / maiorTotalCliente) * 100}%` }}
-                  >
-                    {r.editado > 0 && (
-                      <span className="bg-ledger h-full" style={{ width: `${(r.editado / r.total) * 100}%` }} />
-                    )}
-                    {r.editado > 0 && r.naoEditado > 0 && <span className="w-[2px] h-full bg-paper shrink-0" />}
-                    {r.naoEditado > 0 && (
-                      <span className="bg-amber h-full" style={{ width: `${(r.naoEditado / r.total) * 100}%` }} />
-                    )}
-                  </span>
-                </span>
+                </button>
+                <div className="flex-1 flex flex-wrap gap-1.5 items-center py-0.5">
+                  {r.videos.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => alternarStatus(v)}
+                      title={`${v.nome} — ${v.status === "editado" ? "editado" : "não editado"} (clique pra alternar)`}
+                      className={`w-3.5 h-3.5 rounded-full shrink-0 transition-transform hover:scale-125 ${
+                        v.status === "editado" ? "bg-ledger" : "bg-amber"
+                      }`}
+                    />
+                  ))}
+                </div>
                 <span className="text-xs font-mono tabular text-muted shrink-0 w-14 text-right">
                   {r.editado}/{r.total}
                 </span>
-              </button>
+              </div>
             ))}
           </div>
         </div>
