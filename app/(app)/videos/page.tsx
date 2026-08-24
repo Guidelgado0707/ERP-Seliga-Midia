@@ -125,6 +125,22 @@ export default function VideosPage() {
   const qtdMes = videosMes.length;
   const valorMedioVideo = qtdMes > 0 ? faturamentoMes / qtdMes : 0;
 
+  // resumo por cliente do mês — mesma ideia do quadro físico do escritório:
+  // uma barra por cliente comparando quantos vídeos já foram editados vs. o total
+  const resumoPorCliente = (() => {
+    const porCliente = new Map<string, { editado: number; naoEditado: number }>();
+    for (const v of videosMes) {
+      const atual = porCliente.get(v.cliente) ?? { editado: 0, naoEditado: 0 };
+      if (v.status === "editado") atual.editado += 1;
+      else atual.naoEditado += 1;
+      porCliente.set(v.cliente, atual);
+    }
+    return Array.from(porCliente, ([cliente, c]) => ({ cliente, ...c, total: c.editado + c.naoEditado })).sort(
+      (a, b) => b.total - a.total
+    );
+  })();
+  const maiorTotalCliente = Math.max(...resumoPorCliente.map((r) => r.total), 1);
+
   return (
     <div>
       <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
@@ -177,6 +193,59 @@ export default function VideosPage() {
           tone="ledger"
         />
       </div>
+
+      {resumoPorCliente.length > 0 && (
+        <div className="bg-white rounded-md shadow-sm mb-4 overflow-hidden">
+          <div className="px-5 py-4 border-b border-line flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-sm font-medium text-ink">Resumo por cliente</p>
+              <p className="text-xs text-muted mt-0.5">Editados x pendentes no mês — clique num cliente pra filtrar a lista</p>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-muted shrink-0">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-ledger" />
+                Editado
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber" />
+                Não editado
+              </span>
+            </div>
+          </div>
+          <div className="divide-y divide-line">
+            {resumoPorCliente.map((r) => (
+              <button
+                key={r.cliente}
+                onClick={() => setFiltroCliente((atual) => (atual === r.cliente ? "" : r.cliente))}
+                className={`w-full flex items-center gap-3 px-5 py-2.5 text-left hover:bg-paper transition-colors ${
+                  filtroCliente === r.cliente ? "bg-paper" : ""
+                }`}
+              >
+                <span className="text-sm text-ink w-32 md:w-40 shrink-0 truncate" title={r.cliente}>
+                  {r.cliente}
+                </span>
+                <span className="flex-1 h-3 rounded-full bg-paper overflow-hidden">
+                  <span
+                    className="flex h-full rounded-full overflow-hidden"
+                    style={{ width: `${(r.total / maiorTotalCliente) * 100}%` }}
+                  >
+                    {r.editado > 0 && (
+                      <span className="bg-ledger h-full" style={{ width: `${(r.editado / r.total) * 100}%` }} />
+                    )}
+                    {r.editado > 0 && r.naoEditado > 0 && <span className="w-[2px] h-full bg-paper shrink-0" />}
+                    {r.naoEditado > 0 && (
+                      <span className="bg-amber h-full" style={{ width: `${(r.naoEditado / r.total) * 100}%` }} />
+                    )}
+                  </span>
+                </span>
+                <span className="text-xs font-mono tabular text-muted shrink-0 w-14 text-right">
+                  {r.editado}/{r.total}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleAdd} className="bg-white rounded-md shadow-sm p-5 mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
