@@ -25,10 +25,10 @@ export default function MonthFilter({
     <select
       value={selected}
       onChange={(e) => handleChange(e.target.value)}
-      className="px-3 py-2 rounded-md border border-line text-sm bg-white text-ink capitalize"
+      className="px-3 py-2 rounded-md border border-line text-sm bg-white text-ink"
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value} className="capitalize">
+        <option key={o.value} value={o.value}>
           {o.label}
         </option>
       ))}
