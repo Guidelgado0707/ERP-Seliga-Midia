@@ -15,10 +15,12 @@ export function monthLabel(year: number, monthIndex: number) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-export function monthOptions(count = 12) {
+// count = quantos meses pra trás; monthsAhead = quantos meses pra frente (planejamento,
+// ex: agendar vídeos ou contas de um mês que ainda não chegou)
+export function monthOptions(count = 12, monthsAhead = 6) {
   const now = new Date();
   const options: { value: string; label: string }[] = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = -monthsAhead; i < count; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     options.push({ value, label: monthLabel(d.getFullYear(), d.getMonth()) });
