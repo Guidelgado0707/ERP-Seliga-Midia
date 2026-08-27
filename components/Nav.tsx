@@ -10,6 +10,7 @@ const ITEMS = [
   { href: "/dre", label: "DRE", icon: "▦" },
   { href: "/contas-a-pagar", label: "A Pagar", icon: "↑" },
   { href: "/contas-a-receber", label: "A Receber", icon: "↓" },
+  { href: "/banco", label: "Banco C6", icon: "🏦" },
   { href: "/projeto-jc", label: "Projeto JC", icon: "⊙" },
   { href: "/notas", label: "Notas", icon: "▤" },
   { href: "/faturas", label: "Faturas", icon: "✨" },
