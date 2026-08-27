@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { C6Transaction } from "@/lib/c6bank";
+import Conciliacao from "./Conciliacao";
 
 // ---------- helpers ----------
 
@@ -51,6 +52,8 @@ function addDays(dateStr: string, n: number) {
 }
 
 export default function BancoPage() {
+  const [tab, setTab] = useState<"extrato" | "conciliacao">("extrato");
+
   // Limite confirmado por teste real: o gateway C6 aceita no máximo 30 dias
   // corridos entre start_date e end_date (acima disso, HTTP 500 RF-InvalidRequest).
   const [start, setStart] = useState(daysAgo(30));
@@ -131,7 +134,7 @@ export default function BancoPage() {
       {/* cabeçalho */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold text-ink">Extrato C6 Bank</h1>
+          <h1 className="text-2xl font-display font-bold text-ink">Banco C6</h1>
           <p className="text-sm text-muted mt-0.5">
             Conta PJ · Sandbox{" "}
             <span className="text-amber-600 font-medium">(ambiente de testes)</span>
@@ -139,6 +142,34 @@ export default function BancoPage() {
         </div>
       </div>
 
+      {/* abas */}
+      <div className="flex gap-1 border-b border-line">
+        <button
+          onClick={() => setTab("extrato")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === "extrato"
+              ? "border-ledger text-ledger"
+              : "border-transparent text-muted hover:text-ink"
+          }`}
+        >
+          Extrato
+        </button>
+        <button
+          onClick={() => setTab("conciliacao")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === "conciliacao"
+              ? "border-ledger text-ledger"
+              : "border-transparent text-muted hover:text-ink"
+          }`}
+        >
+          Conciliação
+        </button>
+      </div>
+
+      {tab === "conciliacao" ? (
+        <Conciliacao />
+      ) : (
+        <>
       {/* filtro de período */}
       <div className="bg-white border border-line rounded-xl p-4 flex flex-wrap gap-4 items-end">
         <div className="flex flex-col gap-1">
@@ -302,6 +333,8 @@ export default function BancoPage() {
         <div className="bg-white border border-line rounded-xl py-20 text-center text-muted text-sm">
           Selecione o período e clique em <strong>Consultar extrato</strong>.
         </div>
+      )}
+        </>
       )}
     </div>
   );

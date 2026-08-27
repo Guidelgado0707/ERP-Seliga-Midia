@@ -35,6 +35,9 @@ create table contas_pagar (
   -- 'projeto_jc' = operação separada que compartilha a mesma conta corrente (aba Projeto JC;
   -- entra no saldo do Caixa mas fica fora do Contas a Pagar e da DRE da Seliga Mídia).
   origem text not null default 'seliga_midia' check (origem in ('seliga_midia', 'projeto_jc')),
+  -- referência (reference/local_reference) do lançamento no extrato C6 que conciliou esta conta.
+  -- preenchida pela tela de Conciliação em /banco; impede conciliar o mesmo lançamento duas vezes.
+  banco_referencia text unique,
   created_at timestamptz not null default now(),
   created_by uuid references auth.users(id) default auth.uid()
 );
@@ -57,6 +60,9 @@ create table contas_receber (
   observacoes text,
   nota_fiscal_url text,
   origem text not null default 'seliga_midia' check (origem in ('seliga_midia', 'projeto_jc')),
+  -- referência (reference/local_reference) do lançamento no extrato C6 que conciliou esta conta.
+  -- preenchida pela tela de Conciliação em /banco; impede conciliar o mesmo lançamento duas vezes.
+  banco_referencia text unique,
   created_at timestamptz not null default now(),
   created_by uuid references auth.users(id) default auth.uid()
 );
