@@ -61,12 +61,12 @@ export async function POST() {
   });
 
   const paths = [
+    "/v1/cob", // padrão oficial Bacen: /cob direto, sem /pix/ (escopos são cob.read/cob.write)
+    "/v1/cob/",
+    "/cob",
+    "/cob/",
     "/v1/pix/cob",
     "/v1/pix/cob/",
-    "/pix/cob",
-    "/pix/cob/",
-    "/v1/pix/cobrancas",
-    "/v1/pix",
   ];
 
   const results = [];
