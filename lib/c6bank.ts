@@ -128,22 +128,47 @@ function parseList(raw: unknown): C6Transaction[] {
 
 // ---------- extrato ----------
 
+/** Requisição HTTPS simples sem cert de cliente (só TLS padrão + Bearer) */
+function httpsRequestSimple(
+  urlStr: string,
+  opts: { method: string; headers: Record<string, string> }
+): Promise<RawResponse> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlStr);
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        port: 443,
+        path: u.pathname + u.search,
+        method: opts.method,
+        headers: opts.headers,
+      },
+      (res) => {
+        let raw = "";
+        res.on("data", (chunk: string) => (raw += chunk));
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, body: raw }));
+      }
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 export async function fetchExtrato(
   startDate: string,
   endDate: string
 ): Promise<{ transactions: C6Transaction[]; raw: unknown }> {
-  const { cert, key } = getPem();
   const url = `${C6_BASE}/v1/statement/?start_date=${startDate}&end_date=${endDate}`;
 
   async function doRequest(token: string): Promise<RawResponse> {
-    return httpsRequest(url, {
+    // Tenta sem mTLS primeiro (só Bearer token) — padrão recomendado para
+    // endpoints que não são de autenticação no C6 BaaS
+    return httpsRequestSimple(url, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
-      cert,
-      key,
     });
   }
 
