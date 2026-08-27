@@ -57,44 +57,46 @@ export async function GET() {
   const END = "2025-11-10";
 
   // Variações a testar
+  // Roteiro C6 v3.0 diz: "Endpoint /statement" (sem /v1/ no doc oficial)
+  // Mas /v1/auth/ funciona — testamos ambos os prefixos e vários formatos de param
   const variants: Array<{ label: string; url: string; headers: Record<string, string> }> = [
     {
-      label: "1. /v1/statement (sem trailing slash, snake_case)",
+      label: "1. /statement (sem v1, snake_case) ← roteiro oficial",
+      url: `${C6_BASE}/statement?start_date=${START}&end_date=${END}`,
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    },
+    {
+      label: "2. /statement/ (sem v1, trailing slash)",
+      url: `${C6_BASE}/statement/?start_date=${START}&end_date=${END}`,
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    },
+    {
+      label: "3. /statement (sem v1, camelCase params)",
+      url: `${C6_BASE}/statement?startDate=${START}&endDate=${END}`,
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    },
+    {
+      label: "4. /statement (sem v1, start/end)",
+      url: `${C6_BASE}/statement?start=${START}&end=${END}`,
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    },
+    {
+      label: "5. /v1/statement (com v1, snake_case)",
       url: `${C6_BASE}/v1/statement?start_date=${START}&end_date=${END}`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "2. /v1/statement/ (com trailing slash, snake_case)",
+      label: "6. /v1/statement/ (com v1, trailing slash)",
       url: `${C6_BASE}/v1/statement/?start_date=${START}&end_date=${END}`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "3. /v1/statement (camelCase params)",
-      url: `${C6_BASE}/v1/statement?startDate=${START}&endDate=${END}`,
+      label: "7. /statement sem parâmetros (ver msg de validação)",
+      url: `${C6_BASE}/statement`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "4. /v1/statement (start/end params)",
-      url: `${C6_BASE}/v1/statement?start=${START}&end=${END}`,
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    },
-    {
-      label: "5. /v1/statement com client_id no header",
-      url: `${C6_BASE}/v1/statement?start_date=${START}&end_date=${END}`,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "client_id": clientId,
-        "x-client-id": clientId,
-      },
-    },
-    {
-      label: "6. /v1/baas/statement (path alternativo)",
-      url: `${C6_BASE}/v1/baas/statement?start_date=${START}&end_date=${END}`,
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    },
-    {
-      label: "7. Sem parâmetros (ver erro de validação)",
+      label: "8. /v1/statement sem parâmetros (ver msg de validação)",
       url: `${C6_BASE}/v1/statement`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
