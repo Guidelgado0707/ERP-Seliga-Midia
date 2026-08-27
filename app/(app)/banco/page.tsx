@@ -8,11 +8,6 @@ import type { C6Transaction } from "@/lib/c6bank";
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
-function daysAgo(n: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
-}
 function fmtDate(s?: string) {
   if (!s) return "—";
   const d = s.slice(0, 10);
@@ -23,39 +18,32 @@ function fmtBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-/** Normaliza o valor monetário independente do formato da resposta */
+/** Valor absoluto do lançamento (amount é string no C6, ex: "1500.00") */
 function txAmount(tx: C6Transaction): number {
-  if (typeof tx.amount === "number") return tx.amount;
-  if (tx.transactionAmount?.amount) return parseFloat(tx.transactionAmount.amount);
-  return 0;
+  return parseFloat(tx.amount ?? "0") || 0;
 }
 
-/** Valor ajustado ao sinal (DEBIT = negativo) */
+/** INCOMING = entrada (positivo), OUTGOING = saída (negativo) */
 function txSignedAmount(tx: C6Transaction): number {
-  const v = Math.abs(txAmount(tx));
-  if (tx.creditDebitIndicator === "DEBIT") return -v;
-  return v;
+  const v = txAmount(tx);
+  return tx.operation_type === "OUTGOING" ? -v : v;
 }
 
 function txDate(tx: C6Transaction): string {
-  return tx.date ?? tx.bookingDate ?? tx.dateTime?.slice(0, 10) ?? "";
+  return tx.entry_date ?? tx.created_at?.slice(0, 10) ?? "";
 }
 
 function txDescription(tx: C6Transaction): string {
-  return (
-    tx.description ??
-    tx.memo ??
-    tx.transactionInformation ??
-    tx.type ??
-    "—"
-  );
+  return tx.title ?? tx.description ?? tx.transaction_type ?? "—";
 }
 
 // ---------- componente ----------
 
 export default function BancoPage() {
-  const [start, setStart] = useState(daysAgo(29));
-  const [end, setEnd] = useState(today());
+  // O sandbox C6 tem dados de teste pré-carregados para out/nov 2025.
+  // Para produção, usar datas reais da conta PJ.
+  const [start, setStart] = useState("2025-10-10");
+  const [end, setEnd] = useState("2025-11-10");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<C6Transaction[] | null>(null);
@@ -145,7 +133,6 @@ export default function BancoPage() {
             type="date"
             value={end}
             min={start}
-            max={today()}
             onChange={(e) => setEnd(e.target.value)}
             className="border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ledger"
           />
@@ -230,7 +217,7 @@ export default function BancoPage() {
                 const isCredit = signed >= 0;
                 return (
                   <div
-                    key={tx.id ?? tx.transactionId ?? i}
+                    key={tx.reference ?? tx.local_reference ?? i}
                     className="flex items-center justify-between px-5 py-3.5 hover:bg-paper transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -245,9 +232,9 @@ export default function BancoPage() {
                         </p>
                         <p className="text-xs text-muted">
                           {fmtDate(txDate(tx))}
-                          {tx.type && (
+                          {tx.transaction_type && (
                             <span className="ml-2 bg-paper px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide">
-                              {tx.type}
+                              {tx.transaction_type.replace(/_/g, " ")}
                             </span>
                           )}
                         </p>
@@ -260,13 +247,8 @@ export default function BancoPage() {
                         }`}
                       >
                         {isCredit ? "+" : ""}
-                        {fmtBRL(signed)}
+                        {fmtBRL(Math.abs(signed))}
                       </p>
-                      {tx.balance?.amount && (
-                        <p className="text-xs text-muted">
-                          Saldo: {fmtBRL(parseFloat(tx.balance.amount.amount))}
-                        </p>
-                      )}
                     </div>
                   </div>
                 );

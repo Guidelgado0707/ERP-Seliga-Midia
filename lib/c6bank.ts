@@ -101,22 +101,17 @@ export async function getToken(forceRefresh = false): Promise<string> {
 
 // ---------- tipos do extrato ----------
 
+/** Formato real confirmado na documentação C6 BaaS v1 */
 export interface C6Transaction {
-  /* campos que o C6 pode retornar — ajustamos após a 1ª chamada real */
-  id?: string;
-  transactionId?: string;
-  date?: string;
-  dateTime?: string;
-  bookingDate?: string;
-  description?: string;
-  memo?: string;
-  transactionInformation?: string;
-  amount?: number;
-  transactionAmount?: { amount: string; currency: string };
-  creditDebitIndicator?: "CREDIT" | "DEBIT";
-  status?: string;
-  type?: string;
-  balance?: { amount: { amount: string; currency: string } };
+  local_reference?: string;   // referência local
+  created_at?: string;        // "2025-12-05T14:30:00"
+  entry_date?: string;        // "2025-12-05"
+  amount?: string;            // "1500.00" (string, sempre positivo)
+  title?: string;             // descrição curta
+  description?: string;       // descrição completa
+  reference?: string;         // UUID
+  operation_type?: "INCOMING" | "OUTGOING" | string;
+  transaction_type?: string;  // ex: "CREDIT_QRCODE_PIX_PAYMENT_RECEIVED"
 }
 
 /** Resposta raw pode variar; tentamos as formas mais comuns */
