@@ -61,11 +61,32 @@ export default function BancoPage() {
   const [transactions, setTransactions] = useState<C6Transaction[] | null>(null);
   const [rawDebug, setRawDebug] = useState<unknown>(null);
   const [showRaw, setShowRaw] = useState(false);
+  const [authTest, setAuthTest] = useState<{ ok: boolean; msg: string; elapsed: number } | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const testAuth = useCallback(async () => {
+    setAuthLoading(true);
+    setAuthTest(null);
+    try {
+      const res = await fetch("/api/c6bank/test-auth", { cache: "no-store" });
+      const data = await res.json();
+      setAuthTest({
+        ok: data.ok,
+        msg: data.ok ? `Token OK (${data.tokenLength} chars, ${data.elapsedMs}ms)` : data.error,
+        elapsed: data.elapsedMs ?? 0,
+      });
+    } catch (e) {
+      setAuthTest({ ok: false, msg: String(e), elapsed: 0 });
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     setTransactions(null);
+    setRawDebug(null);
 
     try {
       const res = await fetch(
@@ -73,6 +94,9 @@ export default function BancoPage() {
         { cache: "no-store" }
       );
       const data = await res.json();
+      // Sempre guarda a resposta bruta, mesmo em caso de erro
+      if (data.raw !== undefined) setRawDebug(data.raw);
+      if (data.debug !== undefined) setRawDebug(data.debug);
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setTransactions(data.transactions ?? []);
       setRawDebug(data.raw);
@@ -133,13 +157,31 @@ export default function BancoPage() {
         >
           {loading ? "Carregando…" : "Consultar extrato"}
         </button>
-        {transactions !== null && (
+        {(transactions !== null || rawDebug !== null || error) && (
           <button
             onClick={() => setShowRaw((v) => !v)}
             className="px-3 py-2 rounded-md border border-line text-xs text-muted hover:text-ink transition-colors"
           >
             {showRaw ? "Ocultar" : "Ver"} resposta bruta
           </button>
+        )}
+      </div>
+
+      {/* diagnóstico de autenticação */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          onClick={testAuth}
+          disabled={authLoading}
+          className="px-4 py-2 rounded-md border border-line text-sm text-muted hover:text-ink hover:border-ink transition-colors disabled:opacity-50"
+        >
+          {authLoading ? "Testando…" : "🔑 Testar autenticação"}
+        </button>
+        {authTest && (
+          <span
+            className={`text-sm font-medium ${authTest.ok ? "text-emerald-600" : "text-crimson"}`}
+          >
+            {authTest.ok ? "✓" : "✗"} {authTest.msg}
+          </span>
         )}
       </div>
 
@@ -234,12 +276,16 @@ export default function BancoPage() {
         </div>
       )}
 
-      {/* resposta bruta (debug) */}
-      {showRaw && rawDebug !== null && (
+      {/* resposta bruta (debug) — aparece mesmo em caso de erro */}
+      {showRaw && (
         <div className="bg-gray-950 text-green-400 rounded-xl p-4 overflow-x-auto text-xs font-mono">
           <p className="text-gray-500 mb-2">// resposta bruta da API C6</p>
           <pre className="whitespace-pre-wrap break-all">
-            {JSON.stringify(rawDebug, null, 2)}
+            {rawDebug !== null
+              ? JSON.stringify(rawDebug, null, 2)
+              : error
+              ? `// Nenhuma resposta bruta disponível.\n// Erro capturado:\n${error}`
+              : "// Sem dados ainda."}
           </pre>
         </div>
       )}

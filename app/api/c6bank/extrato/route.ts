@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchExtrato } from "@/lib/c6bank";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30; // até 30s (suficiente para mTLS + token + extrato)
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
