@@ -192,3 +192,62 @@ export async function fetchExtrato(
   const raw: unknown = JSON.parse(res.body);
   return { transactions: parseList(raw), raw };
 }
+
+// ---------- PIX (cobrança imediata) ----------
+
+/**
+ * Cria uma cobrança PIX imediata (sem txid) seguindo o padrão oficial do
+ * Bacen (BR Code / API Pix), usado por todos os PSPs incluindo o C6.
+ * POST /v1/pix/cob
+ */
+export async function createPixCharge(params: {
+  valor: string; // ex: "10.00"
+  chave: string; // chave PIX do recebedor
+  devedorCpf?: string;
+  devedorNome?: string;
+  expiracaoSegundos?: number;
+  solicitacaoPagador?: string;
+}): Promise<{ status: number; body: unknown; requestBody: unknown }> {
+  const { cert, key } = getPem();
+  const token = await getToken();
+
+  const payload: Record<string, unknown> = {
+    calendario: { expiracao: params.expiracaoSegundos ?? 3600 },
+    valor: { original: params.valor },
+    chave: params.chave,
+  };
+  if (params.devedorCpf) {
+    payload.devedor = { cpf: params.devedorCpf, nome: params.devedorNome ?? "Cliente Teste" };
+  }
+  if (params.solicitacaoPagador) {
+    payload.solicitacaoPagador = params.solicitacaoPagador;
+  }
+
+  const body = JSON.stringify(payload);
+  const url = `${C6_BASE}/v1/pix/cob`;
+
+  const res = await httpsRequest(
+    url,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body).toString(),
+        Accept: "application/json",
+      },
+      cert,
+      key,
+    },
+    body
+  );
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(res.body);
+  } catch {
+    parsed = res.body;
+  }
+
+  return { status: res.status, body: parsed, requestBody: payload };
+}
