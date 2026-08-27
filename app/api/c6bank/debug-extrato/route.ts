@@ -53,51 +53,50 @@ export async function GET() {
     return NextResponse.json({ error: "Auth falhou: " + String(e) }, { status: 500 });
   }
 
-  const START = "2025-10-10";
-  const END = "2025-11-10";
-
-  // Variações a testar
-  // Roteiro C6 v3.0 diz: "Endpoint /statement" (sem /v1/ no doc oficial)
-  // Mas /v1/auth/ funciona — testamos ambos os prefixos e vários formatos de param
+  // CONFIRMADO: path correto é /v1/statement, params são start_date/end_date (snake_case).
+  // Teste sem params retornou 400 formatado (chegou no backend).
+  // Teste COM params (range de 31 dias) retornou 500 RF-InvalidRequest (fault no Apigee,
+  // antes do backend) → suspeita: limite de dias no gateway é mais restrito que o esperado.
+  // Testamos aqui vários tamanhos de intervalo para isolar o limite.
   const variants: Array<{ label: string; url: string; headers: Record<string, string> }> = [
     {
-      label: "1. /statement (sem v1, snake_case) ← roteiro oficial",
-      url: `${C6_BASE}/statement?start_date=${START}&end_date=${END}`,
+      label: "A. range de 1 dia (2025-10-10 a 2025-10-11)",
+      url: `${C6_BASE}/v1/statement?start_date=2025-10-10&end_date=2025-10-11`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "2. /statement/ (sem v1, trailing slash)",
-      url: `${C6_BASE}/statement/?start_date=${START}&end_date=${END}`,
+      label: "B. range de 7 dias (2025-10-10 a 2025-10-17)",
+      url: `${C6_BASE}/v1/statement?start_date=2025-10-10&end_date=2025-10-17`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "3. /statement (sem v1, camelCase params)",
-      url: `${C6_BASE}/statement?startDate=${START}&endDate=${END}`,
+      label: "C. range de 30 dias (2025-10-10 a 2025-11-09)",
+      url: `${C6_BASE}/v1/statement?start_date=2025-10-10&end_date=2025-11-09`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "4. /statement (sem v1, start/end)",
-      url: `${C6_BASE}/statement?start=${START}&end=${END}`,
+      label: "D. range de 31 dias (2025-10-10 a 2025-11-10) ← igual ao original",
+      url: `${C6_BASE}/v1/statement?start_date=2025-10-10&end_date=2025-11-10`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "5. /v1/statement (com v1, snake_case)",
-      url: `${C6_BASE}/v1/statement?start_date=${START}&end_date=${END}`,
+      label: "E. mesma data (2025-10-10 a 2025-10-10)",
+      url: `${C6_BASE}/v1/statement?start_date=2025-10-10&end_date=2025-10-10`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "6. /v1/statement/ (com v1, trailing slash)",
-      url: `${C6_BASE}/v1/statement/?start_date=${START}&end_date=${END}`,
+      label: "F. datas de hoje (data atual, range de 7 dias)",
+      url: `${C6_BASE}/v1/statement?start_date=2026-08-20&end_date=2026-08-27`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "7. /statement sem parâmetros (ver msg de validação)",
-      url: `${C6_BASE}/statement`,
+      label: "G. só start_date (sem end_date)",
+      url: `${C6_BASE}/v1/statement?start_date=2025-10-10`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
     {
-      label: "8. /v1/statement sem parâmetros (ver msg de validação)",
-      url: `${C6_BASE}/v1/statement`,
+      label: "H. ordem invertida end_date antes de start_date",
+      url: `${C6_BASE}/v1/statement?end_date=2025-10-17&start_date=2025-10-10`,
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     },
   ];
