@@ -55,14 +55,27 @@ export default function BancoPage() {
   const testAuth = useCallback(async () => {
     setAuthLoading(true);
     setAuthTest(null);
+    setRawDebug(null);
     try {
       const res = await fetch("/api/c6bank/test-auth", { cache: "no-store" });
       const data = await res.json();
+      // mostra a resposta bruta do auth no painel de debug
+      setRawDebug(data);
+      setShowRaw(true);
+      const raw = data.rawResponse as Record<string, unknown> | null;
+      const tokenKey = raw
+        ? Object.keys(raw).find((k) => k.toLowerCase().includes("token"))
+        : null;
+      const tokenVal = tokenKey && raw ? String(raw[tokenKey]) : null;
       setAuthTest({
         ok: data.ok,
-        msg: data.ok ? `Token OK (${data.tokenLength} chars, ${data.elapsedMs}ms)` : data.error,
+        msg: data.ok
+          ? `Auth OK (HTTP ${data.httpStatus}, campo token: "${tokenKey ?? "?"}", ${data.elapsedMs}ms)`
+          : `Erro HTTP ${data.httpStatus}: ${data.error ?? JSON.stringify(data.rawResponse)}`,
         elapsed: data.elapsedMs ?? 0,
       });
+      // sobrescreve o tokenPrefix para mostrar o campo certo em logs futuros
+      if (tokenVal) console.log("C6 token field:", tokenKey, "| prefix:", tokenVal.slice(0, 30));
     } catch (e) {
       setAuthTest({ ok: false, msg: String(e), elapsed: 0 });
     } finally {
