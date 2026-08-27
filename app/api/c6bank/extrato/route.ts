@@ -16,13 +16,13 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Valida que o intervalo não excede 31 dias (C6 usa "30 dias" mas
-  // o próprio exemplo deles vai de Oct 10 a Nov 10 = 31 dias corridos)
+  // Confirmado por teste real: o limite do gateway C6 é 30 dias corridos.
+  // Acima disso o Apigee rejeita com RF-InvalidRequest (fault genérico, sem detalhe).
   const diff =
     (new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24);
-  if (diff > 31) {
+  if (diff > 30) {
     return NextResponse.json(
-      { error: "O intervalo máximo é de 31 dias" },
+      { error: "O intervalo máximo é de 30 dias" },
       { status: 400 }
     );
   }

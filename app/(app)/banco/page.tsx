@@ -39,11 +39,22 @@ function txDescription(tx: C6Transaction): string {
 
 // ---------- componente ----------
 
+function daysAgo(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+function addDays(dateStr: string, n: number) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function BancoPage() {
-  // O sandbox C6 tem dados de teste pré-carregados para out/nov 2025.
-  // Para produção, usar datas reais da conta PJ.
-  const [start, setStart] = useState("2025-10-10");
-  const [end, setEnd] = useState("2025-11-10");
+  // Limite confirmado por teste real: o gateway C6 aceita no máximo 30 dias
+  // corridos entre start_date e end_date (acima disso, HTTP 500 RF-InvalidRequest).
+  const [start, setStart] = useState(daysAgo(30));
+  const [end, setEnd] = useState(daysAgo(0));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<C6Transaction[] | null>(null);
@@ -146,6 +157,7 @@ export default function BancoPage() {
             type="date"
             value={end}
             min={start}
+            max={addDays(start, 30)}
             onChange={(e) => setEnd(e.target.value)}
             className="border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ledger"
           />
