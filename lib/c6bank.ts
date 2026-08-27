@@ -161,14 +161,17 @@ export async function fetchExtrato(
   const url = `${C6_BASE}/v1/statement/?start_date=${startDate}&end_date=${endDate}`;
 
   async function doRequest(token: string): Promise<RawResponse> {
-    // Tenta sem mTLS primeiro (só Bearer token) — padrão recomendado para
-    // endpoints que não são de autenticação no C6 BaaS
-    return httpsRequestSimple(url, {
+    // C6 exige mTLS (cert+key) em TODOS os endpoints, incluindo /statement/
+    // O Bearer token entra como camada extra de autenticação no header.
+    const { cert, key } = getPem();
+    return httpsRequest(url, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
+      cert,
+      key,
     });
   }
 
