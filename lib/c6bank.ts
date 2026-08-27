@@ -197,8 +197,8 @@ export async function fetchExtrato(
 
 /**
  * Cria uma cobrança PIX imediata (sem txid) seguindo o padrão oficial do
- * Bacen (BR Code / API Pix), usado por todos os PSPs incluindo o C6.
- * POST /v1/pix/cob
+ * Bacen (BR Code / API Pix). Confirmado na doc C6: POST /v2/pix/cob
+ * (note a versão v2, diferente do /v1/ usado em auth e statement).
  */
 export async function createPixCharge(params: {
   valor: string; // ex: "10.00"
@@ -224,7 +224,7 @@ export async function createPixCharge(params: {
   }
 
   const body = JSON.stringify(payload);
-  const url = `${C6_BASE}/v1/pix/cob`;
+  const url = `${C6_BASE}/v2/pix/cob`;
 
   const res = await httpsRequest(
     url,
