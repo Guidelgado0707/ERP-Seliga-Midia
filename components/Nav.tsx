@@ -18,6 +18,7 @@ const ITEMS = [
   { href: "/socios", label: "Sócios", icon: "◍" },
   { href: "/propostas", label: "Propostas", icon: "◈" },
   { href: "/contratos", label: "Contratos", icon: "▧" },
+  { href: "/auditoria", label: "Auditoria", icon: "🛡️" },
 ];
 
 export default function Nav() {

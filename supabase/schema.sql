@@ -314,3 +314,72 @@ insert into categorias (nome, tipo) values
   ('Impostos', 'pagar'),
   ('Aluguel e Infraestrutura', 'pagar'),
   ('Fornecedores/Freelancers', 'pagar');
+
+-- ============================================================
+-- LOG DE AUDITORIA — quem criou/editou/apagou linhas nas tabelas
+-- financeiras sensíveis. Ver supabase/audit_log.sql pra detalhes/comentários
+-- (esse bloco aqui é o mesmo conteúdo, incluído no schema.sql pra quem
+-- instalar o projeto do zero já subir com isso pronto).
+-- ============================================================
+
+create table audit_log (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  user_id uuid,
+  user_email text,
+  tabela text not null,
+  registro_id uuid,
+  acao text not null check (acao in ('insert', 'update', 'delete')),
+  dados_antes jsonb,
+  dados_depois jsonb
+);
+create index idx_audit_log_tabela on audit_log (tabela, created_at desc);
+create index idx_audit_log_registro on audit_log (registro_id);
+alter table audit_log enable row level security;
+
+create policy "authenticated_read_audit_log" on audit_log
+  for select to authenticated
+  using (true);
+
+create or replace function fn_audit_log() returns trigger as $$
+declare
+  v_user_id uuid;
+  v_user_email text;
+begin
+  v_user_id := auth.uid();
+  select email into v_user_email from auth.users where id = v_user_id;
+
+  insert into audit_log (user_id, user_email, tabela, registro_id, acao, dados_antes, dados_depois)
+  values (
+    v_user_id,
+    v_user_email,
+    TG_TABLE_NAME,
+    coalesce((case when TG_OP = 'DELETE' then old.id else new.id end), null),
+    lower(TG_OP),
+    case when TG_OP in ('UPDATE', 'DELETE') then to_jsonb(old) else null end,
+    case when TG_OP in ('INSERT', 'UPDATE') then to_jsonb(new) else null end
+  );
+
+  return case when TG_OP = 'DELETE' then old else new end;
+end;
+$$ language plpgsql security definer;
+
+create trigger trg_audit_contas_pagar
+  after insert or update or delete on contas_pagar
+  for each row execute function fn_audit_log();
+
+create trigger trg_audit_contas_receber
+  after insert or update or delete on contas_receber
+  for each row execute function fn_audit_log();
+
+create trigger trg_audit_dividendos_socios
+  after insert or update or delete on dividendos_socios
+  for each row execute function fn_audit_log();
+
+create trigger trg_audit_pro_labore
+  after insert or update or delete on pro_labore
+  for each row execute function fn_audit_log();
+
+create trigger trg_audit_caixa_referencia
+  after insert or update or delete on caixa_referencia
+  for each row execute function fn_audit_log();
