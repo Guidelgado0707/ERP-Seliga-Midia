@@ -34,10 +34,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isLoginPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  if (user) {
+    // conta com 2FA ativado: sessão só na senha (aal1) não é suficiente pra
+    // acessar o resto do app — falta completar o desafio do código (aal2)
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const precisaMfa = aal?.currentLevel === "aal1" && aal?.nextLevel === "aal2";
+
+    if (precisaMfa && !isLoginPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+
+    if (!precisaMfa && isLoginPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
   }
 
   return response;

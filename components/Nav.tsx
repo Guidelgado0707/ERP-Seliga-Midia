@@ -71,7 +71,19 @@ export default function Nav() {
             );
           })}
         </nav>
-        <div className="px-3 py-4 border-t border-line">
+        <div className="px-3 py-4 border-t border-line space-y-1">
+          <Link
+            href="/seguranca"
+            prefetch={false}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+              pathname.startsWith("/seguranca")
+                ? "bg-ledger-soft text-ledger-dark"
+                : "text-muted hover:bg-paper hover:text-ink"
+            }`}
+          >
+            <span className="w-4 text-center">🔐</span>
+            Segurança
+          </Link>
           <button
             onClick={handleLogout}
             className="w-full text-left px-3 py-2.5 rounded-md text-sm font-medium text-muted hover:bg-paper hover:text-crimson transition-colors"
