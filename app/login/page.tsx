@@ -33,6 +33,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-paper px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-seliga-midia.png" alt="Seliga Mídia" className="h-20 w-auto mx-auto mb-3" />
           <p className="font-display font-semibold text-2xl text-ink">Gestão Seliga Mídia</p>
           <p className="text-sm text-muted mt-1">Entre para acessar sua gestão financeira</p>
         </div>

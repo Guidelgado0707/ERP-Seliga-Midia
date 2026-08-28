@@ -43,9 +43,13 @@ export default function Nav() {
     <>
       {/* Desktop: sidebar fixa à esquerda */}
       <aside className="hidden md:flex md:flex-col md:w-60 md:fixed md:inset-y-0 border-r border-line bg-white">
-        <div className="px-6 py-6 border-b border-line">
-          <p className="font-display font-semibold text-lg tracking-tight text-ink">Gestão Seliga Mídia</p>
-          <p className="text-xs text-muted mt-0.5">Gestão financeira</p>
+        <div className="px-6 py-6 border-b border-line flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-seliga-midia.png" alt="Seliga Mídia" className="h-10 w-10 object-contain shrink-0" />
+          <div className="min-w-0">
+            <p className="font-display font-semibold text-lg tracking-tight text-ink leading-tight">Seliga Mídia</p>
+            <p className="text-xs text-muted">Gestão financeira</p>
+          </div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
           {ITEMS.map((item) => {
