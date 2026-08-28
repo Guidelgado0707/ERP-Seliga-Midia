@@ -169,21 +169,22 @@ function DREBloco({ dre }: { dre: ReturnType<typeof montarDRE> }) {
 export default async function DrePage({
   searchParams,
 }: {
-  searchParams: { mes?: string; ano?: string };
+  searchParams: Promise<{ mes?: string; ano?: string }>;
 }) {
-  const supabase = createClient();
+  const params = await searchParams;
+  const supabase = await createClient();
   const now = new Date();
 
   let selectedMonthYear = now.getFullYear();
   let selectedMonthIndex = now.getMonth();
-  if (searchParams.mes) {
-    const [y, m] = searchParams.mes.split("-").map(Number);
+  if (params.mes) {
+    const [y, m] = params.mes.split("-").map(Number);
     if (y && m) {
       selectedMonthYear = y;
       selectedMonthIndex = m - 1;
     }
   }
-  const selectedAno = searchParams.ano ? Number(searchParams.ano) : now.getFullYear();
+  const selectedAno = params.ano ? Number(params.ano) : now.getFullYear();
   const selectedMes = `${selectedMonthYear}-${String(selectedMonthIndex + 1).padStart(2, "0")}`;
 
   const { start: mesStart, end: mesEnd } = monthRange(selectedMonthYear, selectedMonthIndex);

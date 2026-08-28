@@ -57,7 +57,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|api).*)",
-  ],
+  // exclui _next, api, e qualquer caminho com extensão de arquivo (imagens,
+  // manifest.json etc.) — sem isso, arquivos estáticos como a logo ficavam
+  // sendo redirecionados pro /login quando deslogado (bug antigo, já
+  // corrigido no ERP Açaí-se, replicado aqui do mesmo jeito)
+  matcher: ["/((?!_next/static|_next/image|api|.*\\.[\\w]+$).*)"],
 };
