@@ -3,13 +3,18 @@
  * Usada apenas para gerar uma movimentação de teste e validar
  * o fluxo completo (PIX → aparece no extrato).
  */
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createPixCharge } from "@/lib/c6bank";
+import { tokenValido } from "@/lib/bancoPin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (!tokenValido(request.headers.get("x-banco-pin-token"))) {
+    return NextResponse.json({ error: "PIN não verificado ou expirado" }, { status: 401 });
+  }
+
   const chave = process.env.C6_PIX_KEY;
   if (!chave) {
     return NextResponse.json(

@@ -2,8 +2,9 @@
  * Rota de diagnóstico: testa apenas a autenticação C6 (mTLS + OAuth2).
  * Útil para isolar se o problema é no auth ou no extrato.
  */
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { C6_BASE } from "@/lib/c6bank";
+import { tokenValido } from "@/lib/bancoPin";
 import https from "node:https";
 import { URL } from "node:url";
 
@@ -32,7 +33,11 @@ function httpsRequest(
   });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!tokenValido(request.headers.get("x-banco-pin-token"))) {
+    return NextResponse.json({ error: "PIN não verificado ou expirado" }, { status: 401 });
+  }
+
   const t0 = Date.now();
   const certB64 = process.env.C6_CERT_PEM_B64 ?? "";
   const keyB64 = process.env.C6_KEY_PEM_B64 ?? "";

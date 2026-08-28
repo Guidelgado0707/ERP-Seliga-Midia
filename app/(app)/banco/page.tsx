@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { C6Transaction } from "@/lib/c6bank";
 import Conciliacao from "./Conciliacao";
+import PinGate, { useBancoPinToken } from "./PinGate";
 
 // ---------- helpers ----------
 
@@ -51,7 +52,8 @@ function addDays(dateStr: string, n: number) {
   return d.toISOString().slice(0, 10);
 }
 
-export default function BancoPage() {
+function BancoConteudo() {
+  const pinToken = useBancoPinToken();
   const [tab, setTab] = useState<"extrato" | "conciliacao">("extrato");
 
   // Limite confirmado por teste real: o gateway C6 aceita no máximo 30 dias
@@ -71,7 +73,10 @@ export default function BancoPage() {
     setAuthTest(null);
     setRawDebug(null);
     try {
-      const res = await fetch("/api/c6bank/test-auth", { cache: "no-store" });
+      const res = await fetch("/api/c6bank/test-auth", {
+        cache: "no-store",
+        headers: { "x-banco-pin-token": pinToken ?? "" },
+      });
       const data = await res.json();
       // mostra a resposta bruta do auth no painel de debug
       setRawDebug(data);
@@ -95,7 +100,7 @@ export default function BancoPage() {
     } finally {
       setAuthLoading(false);
     }
-  }, []);
+  }, [pinToken]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,7 +111,7 @@ export default function BancoPage() {
     try {
       const res = await fetch(
         `/api/c6bank/extrato?start=${start}&end=${end}`,
-        { cache: "no-store" }
+        { cache: "no-store", headers: { "x-banco-pin-token": pinToken ?? "" } }
       );
       const data = await res.json();
       // Sempre guarda a resposta bruta, mesmo em caso de erro
@@ -120,7 +125,7 @@ export default function BancoPage() {
     } finally {
       setLoading(false);
     }
-  }, [start, end]);
+  }, [start, end, pinToken]);
 
   const creditos = transactions
     ? transactions.filter((t) => txSignedAmount(t) > 0).reduce((s, t) => s + txAmount(t), 0)
@@ -337,5 +342,13 @@ export default function BancoPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function BancoPage() {
+  return (
+    <PinGate>
+      <BancoConteudo />
+    </PinGate>
   );
 }

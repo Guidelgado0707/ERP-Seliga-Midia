@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { createClient } from "@/lib/supabaseClient";
 import type { C6Transaction } from "@/lib/c6bank";
+import { useBancoPinToken } from "./PinGate";
 
 // ---------- helpers ----------
 
@@ -62,6 +63,7 @@ type Sugestao = { tx: C6Transaction; candidatos: Candidato[] };
 
 export default function Conciliacao() {
   const supabase = createClient();
+  const pinToken = useBancoPinToken();
 
   const [start, setStart] = useState(daysAgo(30));
   const [end, setEnd] = useState(daysAgo(0));
@@ -84,6 +86,7 @@ export default function Conciliacao() {
     try {
       const res = await fetch(`/api/c6bank/extrato?start=${start}&end=${end}`, {
         cache: "no-store",
+        headers: { "x-banco-pin-token": pinToken ?? "" },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -154,7 +157,7 @@ export default function Conciliacao() {
     } finally {
       setLoading(false);
     }
-  }, [start, end, supabase]);
+  }, [start, end, supabase, pinToken]);
 
   async function confirmar(tx: C6Transaction, candidato: Candidato) {
     const ref = txRef(tx);

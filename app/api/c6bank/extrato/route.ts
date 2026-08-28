@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchExtrato } from "@/lib/c6bank";
+import { tokenValido } from "@/lib/bancoPin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30; // até 30s (suficiente para mTLS + token + extrato)
 
 export async function GET(request: NextRequest) {
+  if (!tokenValido(request.headers.get("x-banco-pin-token"))) {
+    return NextResponse.json({ error: "PIN não verificado ou expirado" }, { status: 401 });
+  }
+
   const { searchParams } = request.nextUrl;
   const start = searchParams.get("start");
   const end = searchParams.get("end");
