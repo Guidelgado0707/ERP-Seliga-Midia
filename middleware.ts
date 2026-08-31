@@ -35,18 +35,29 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user) {
-    // conta com 2FA ativado: sessão só na senha (aal1) não é suficiente pra
-    // acessar o resto do app — falta completar o desafio do código (aal2)
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const precisaMfa = aal?.currentLevel === "aal1" && aal?.nextLevel === "aal2";
+    const current = aal?.currentLevel;
+    const next = aal?.nextLevel;
+    const isSeguranca = request.nextUrl.pathname.startsWith("/seguranca");
 
-    if (precisaMfa && !isLoginPage) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      return NextResponse.redirect(url);
-    }
-
-    if (!precisaMfa && isLoginPage) {
+    if (current === "aal1" && next === "aal2") {
+      // tem 2FA ativado mas a sessão só passou pela senha — precisa completar
+      // o desafio do código (a tela de login sabe mostrar esse passo)
+      if (!isLoginPage) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/login";
+        return NextResponse.redirect(url);
+      }
+    } else if (current === "aal1" && next === "aal1") {
+      // 2FA OBRIGATÓRIO: quem ainda não cadastrou fica preso na tela de
+      // Segurança até ativar. Libera só /seguranca (e /login) pra não dar loop.
+      if (!isSeguranca && !isLoginPage) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/seguranca";
+        return NextResponse.redirect(url);
+      }
+    } else if (isLoginPage) {
+      // sessão completa (aal2) e ainda no login → manda pro painel
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);

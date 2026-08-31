@@ -180,10 +180,15 @@ export default function SegurancaPage() {
           ))}
         </div>
       ) : (
-        <div className="bg-white border border-line rounded-xl p-5 space-y-3">
+        <div className="bg-white border border-crimson/30 rounded-xl p-5 space-y-3">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+            <strong>🔒 2FA obrigatório.</strong> Pra proteger os dados financeiros, ativar a
+            autenticação de dois fatores é obrigatório. Você precisa concluir os passos abaixo pra
+            liberar o acesso ao resto do sistema.
+          </div>
           <p className="text-sm text-muted">
-            Adicione uma camada extra de proteção: depois de ativar, o login vai pedir a senha e
-            um código de 6 dígitos gerado por um app autenticador no seu celular.
+            Depois de ativar, o login vai pedir a senha e um código de 6 dígitos gerado por um app
+            autenticador no seu celular (Google Authenticator, Authy, 1Password etc.).
           </p>
           {erro && <p className="text-sm text-crimson">{erro}</p>}
           <button
