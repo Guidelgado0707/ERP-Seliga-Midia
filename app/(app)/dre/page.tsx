@@ -3,6 +3,7 @@ import MonthFilter from "@/components/MonthFilter";
 import YearFilter from "@/components/YearFilter";
 import { DreLinha } from "@/components/DreLinha";
 import { monthRange, monthLabel, monthOptions, yearOptions } from "@/lib/dateUtils";
+import DestinacaoResultado from "./DestinacaoResultado";
 
 function formatBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -238,6 +239,7 @@ export default async function DrePage({
     anoPagarJC,
     mesReceitaJC,
     mesPagarJC,
+    destinacaoAno,
   ] = await Promise.all([
     supabase.from("categorias").select("id, nome, tipo_custo"),
     supabase
@@ -299,10 +301,21 @@ export default async function DrePage({
       .eq("origem", "projeto_jc")
       .gte("data_pagamento", mesStart)
       .lte("data_pagamento", mesEnd),
+    // destinação do resultado — reservas do ano (pra somar no bloco anual)
+    supabase
+      .from("destinacao_resultado")
+      .select("reserva")
+      .gte("mes", `${selectedAno}-01`)
+      .lte("mes", `${selectedAno}-12`),
   ]);
 
   const somaValor = (rows: { valor: number }[] | null) =>
     (rows ?? []).reduce((acc, r) => acc + Number(r.valor), 0);
+
+  const reservaAno = (destinacaoAno.data ?? []).reduce(
+    (acc, r) => acc + Number((r as { reserva: number }).reserva),
+    0
+  );
 
   const categorias = (categoriasRes.data as Categoria[]) ?? [];
   const dreAno = montarDRE((anoReceita.data as ContaRow[]) ?? [], (anoPagar.data as ContaRow[]) ?? [], categorias, {
@@ -329,6 +342,7 @@ export default async function DrePage({
       </div>
       <div className="mb-6">
         <DREBloco dre={dreAno} />
+        <DestinacaoResultado lucroLiquido={dreAno.lucroLiquido} readOnly reservaFixa={reservaAno} />
       </div>
 
       <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
@@ -338,6 +352,7 @@ export default async function DrePage({
         <MonthFilter options={monthOptions(36)} selected={selectedMes} />
       </div>
       <DREBloco dre={dreMes} />
+      <DestinacaoResultado lucroLiquido={dreMes.lucroLiquido} mes={selectedMes} />
     </div>
   );
 }
