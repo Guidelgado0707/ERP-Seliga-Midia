@@ -20,7 +20,14 @@ function agruparPorCategoria(rows: ContaRow[], nomeMap: Map<string, string>) {
   return Array.from(totals, ([nome, valor]) => ({ nome, valor }));
 }
 
-function montarDRE(receitaRows: ContaRow[], pagarRows: ContaRow[], categorias: Categoria[]) {
+function montarDRE(
+  receitaRows: ContaRow[],
+  pagarRows: ContaRow[],
+  categorias: Categoria[],
+  // Projeto JC entra como duas linhas agregadas (receita total e custo total),
+  // separado das categorias da Seliga, mas somando no lucro líquido final.
+  jc: { receita: number; custo: number } = { receita: 0, custo: 0 }
+) {
   const nomeMap = new Map(categorias.map((c) => [c.id, c.nome]));
   const tipoCustoPorNome = new Map(categorias.map((c) => [c.nome, c.tipo_custo]));
 
@@ -45,14 +52,21 @@ function montarDRE(receitaRows: ContaRow[], pagarRows: ContaRow[], categorias: C
   const receitaLiquida = receitaBruta - impostos;
   const totalDespesas = totalFixas + totalVariaveis;
 
-  // Lucro Operacional (EBIT): resultado das operações, antes de resultado financeiro.
-  // Como o sistema não rastreia receitas/despesas financeiras, e o regime é Simples
-  // Nacional (sem IR/CSLL apurado à parte — já embutido no imposto sobre a receita),
-  // Lucro Operacional = Lucro Líquido do período nesta DRE.
+  // Lucro Operacional (EBIT): resultado da operação SELIGA, antes do Projeto JC.
   const lucroOperacional = receitaLiquida - totalDespesas;
-  const lucroLiquido = lucroOperacional;
   const margemOperacional = receitaLiquida > 0 ? (lucroOperacional / receitaLiquida) * 100 : 0;
-  const margemLiquida = receitaLiquida > 0 ? (lucroLiquido / receitaLiquida) * 100 : 0;
+
+  // Projeto JC (temporário): resultado próprio, somado ao lucro líquido final.
+  const receitaJC = jc.receita;
+  const custoJC = jc.custo;
+  const resultadoJC = receitaJC - custoJC;
+  const temJC = receitaJC !== 0 || custoJC !== 0;
+
+  // Lucro líquido do período = resultado da Seliga + resultado do JC.
+  const lucroLiquido = lucroOperacional + resultadoJC;
+  // margem líquida sobre a receita total combinada (Seliga líquida + receita JC)
+  const receitaTotalCombinada = receitaLiquida + receitaJC;
+  const margemLiquida = receitaTotalCombinada > 0 ? (lucroLiquido / receitaTotalCombinada) * 100 : 0;
 
   // Margem de contribuição (custeio variável): impostos sobre a receita são
   // proporcionais ao faturamento, então contam como variáveis aqui — mesmo já
@@ -76,6 +90,10 @@ function montarDRE(receitaRows: ContaRow[], pagarRows: ContaRow[], categorias: C
     lucroLiquido,
     margemOperacional,
     margemLiquida,
+    receitaJC,
+    custoJC,
+    resultadoJC,
+    temJC,
     margemContribuicaoValor,
     indiceMC,
     pontoEquilibrio,
@@ -124,19 +142,38 @@ function DREBloco({ dre }: { dre: ReturnType<typeof montarDRE> }) {
       <DreLinha label="= Lucro operacional (EBIT)" value={dre.lucroOperacional} variant="total" />
       <div className="px-5 pb-2 -mt-1">
         <p className="text-xs text-muted">
-          Margem operacional: <span className="font-mono tabular">{dre.margemOperacional.toFixed(1)}%</span>
+          Margem operacional (Seliga): <span className="font-mono tabular">{dre.margemOperacional.toFixed(1)}%</span>
         </p>
       </div>
 
-      <DreLinha label="= Lucro líquido do período" value={dre.lucroLiquido} variant="total" />
+      {/* Projeto JC — operação temporária, mostrada separada e somada no lucro final */}
+      {dre.temJC && (
+        <>
+          <div className="px-5 pt-3 pb-1">
+            <p className="text-xs font-medium text-muted uppercase tracking-wide">
+              Projeto JC <span className="normal-case text-[10px] text-amber-600">(temporário)</span>
+            </p>
+          </div>
+          <DreLinha label="Receita de JC" value={dre.receitaJC} indent />
+          <DreLinha label="(-) Custo de JC" value={-dre.custoJC} indent />
+          <DreLinha label="= Resultado JC" value={dre.resultadoJC} variant="subtotal" />
+        </>
+      )}
+
+      <DreLinha
+        label={dre.temJC ? "= Lucro líquido do período (Seliga + JC)" : "= Lucro líquido do período"}
+        value={dre.lucroLiquido}
+        variant="total"
+      />
       <div className="px-5 pb-1 -mt-1">
         <p className="text-xs text-muted">
           Margem líquida: <span className="font-mono tabular">{dre.margemLiquida.toFixed(1)}%</span>
         </p>
       </div>
       <p className="px-5 pb-3 text-[11px] text-muted leading-relaxed">
-        No Simples Nacional o imposto sobre o lucro já vem embutido no imposto sobre a receita, e o sistema não
-        rastreia receitas/despesas financeiras — por isso Lucro Operacional = Lucro Líquido aqui.
+        {dre.temJC
+          ? "O Projeto JC é uma operação temporária, mostrada separada das categorias da Seliga mas somada no lucro líquido do período. O Ponto de equilíbrio abaixo considera só a operação Seliga."
+          : "No Simples Nacional o imposto sobre o lucro já vem embutido no imposto sobre a receita, e o sistema não rastreia receitas/despesas financeiras — por isso Lucro Operacional = Lucro Líquido aqui."}
       </p>
 
       <div className="px-5 py-3 bg-paper border-t-2 border-line space-y-1.5">
@@ -191,7 +228,17 @@ export default async function DrePage({
   const yearStart = `${selectedAno}-01-01`;
   const yearEnd = `${selectedAno}-12-31`;
 
-  const [categoriasRes, anoReceita, anoPagar, mesReceita, mesPagar] = await Promise.all([
+  const [
+    categoriasRes,
+    anoReceita,
+    anoPagar,
+    mesReceita,
+    mesPagar,
+    anoReceitaJC,
+    anoPagarJC,
+    mesReceitaJC,
+    mesPagarJC,
+  ] = await Promise.all([
     supabase.from("categorias").select("id, nome, tipo_custo"),
     supabase
       .from("contas_receber")
@@ -223,11 +270,49 @@ export default async function DrePage({
       .eq("origem", "seliga_midia")
       .gte("data_pagamento", mesStart)
       .lte("data_pagamento", mesEnd),
+    // Projeto JC — mesmos filtros do Painel (origem projeto_jc, sem reembolso)
+    supabase
+      .from("contas_receber")
+      .select("valor")
+      .eq("status", "recebido")
+      .eq("origem", "projeto_jc")
+      .gte("data_recebimento", yearStart)
+      .lte("data_recebimento", yearEnd),
+    supabase
+      .from("contas_pagar")
+      .select("valor")
+      .eq("status", "pago")
+      .eq("origem", "projeto_jc")
+      .gte("data_pagamento", yearStart)
+      .lte("data_pagamento", yearEnd),
+    supabase
+      .from("contas_receber")
+      .select("valor")
+      .eq("status", "recebido")
+      .eq("origem", "projeto_jc")
+      .gte("data_recebimento", mesStart)
+      .lte("data_recebimento", mesEnd),
+    supabase
+      .from("contas_pagar")
+      .select("valor")
+      .eq("status", "pago")
+      .eq("origem", "projeto_jc")
+      .gte("data_pagamento", mesStart)
+      .lte("data_pagamento", mesEnd),
   ]);
 
+  const somaValor = (rows: { valor: number }[] | null) =>
+    (rows ?? []).reduce((acc, r) => acc + Number(r.valor), 0);
+
   const categorias = (categoriasRes.data as Categoria[]) ?? [];
-  const dreAno = montarDRE((anoReceita.data as ContaRow[]) ?? [], (anoPagar.data as ContaRow[]) ?? [], categorias);
-  const dreMes = montarDRE((mesReceita.data as ContaRow[]) ?? [], (mesPagar.data as ContaRow[]) ?? [], categorias);
+  const dreAno = montarDRE((anoReceita.data as ContaRow[]) ?? [], (anoPagar.data as ContaRow[]) ?? [], categorias, {
+    receita: somaValor(anoReceitaJC.data),
+    custo: somaValor(anoPagarJC.data),
+  });
+  const dreMes = montarDRE((mesReceita.data as ContaRow[]) ?? [], (mesPagar.data as ContaRow[]) ?? [], categorias, {
+    receita: somaValor(mesReceitaJC.data),
+    custo: somaValor(mesPagarJC.data),
+  });
 
   return (
     <div>
