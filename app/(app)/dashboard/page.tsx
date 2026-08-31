@@ -97,6 +97,7 @@ export default async function DashboardPage({
     tresAnosRecebido,
     tresAnosPago,
     caixaRefRes,
+    mesEntrouTotal,
   ] = await Promise.all([
     supabase
       .from("contas_receber")
@@ -216,6 +217,14 @@ export default async function DashboardPage({
       .select("conta, data_referencia, valor, created_at")
       .order("data_referencia", { ascending: false })
       .order("created_at", { ascending: false }),
+    // TOTAL que de fato entrou no mês — sem filtro de origem nem reembolso
+    // (Seliga + JC + reembolsos): o dinheiro real que caiu na conta.
+    supabase
+      .from("contas_receber")
+      .select("valor")
+      .eq("status", "recebido")
+      .gte("data_recebimento", mesStart)
+      .lte("data_recebimento", mesEnd),
   ]);
 
   const todasReferencias = caixaRefRes.data ?? [];
@@ -299,6 +308,13 @@ export default async function DashboardPage({
   const faturamentoMes = sum(mesFaturado.data);
   const custoMes = sum(mesCusto.data);
   const saldoMes = faturamentoMes - custoMes;
+
+  // Total real que entrou no mês (Seliga + JC + reembolso) e o detalhamento.
+  // faturamentoMes já é a fatia Seliga sem reembolso; JC vem do mapa por mês;
+  // reembolso é o que sobra (total − Seliga − JC).
+  const totalEntrouMes = sum(mesEntrouTotal.data);
+  const jcRecebidoMes = recebidoJCPorMes.get(selectedMes) ?? 0;
+  const reembolsoMes = totalEntrouMes - faturamentoMes - jcRecebidoMes;
 
   const totalAPagar = sum(aPagarAberto.data);
 
@@ -457,21 +473,47 @@ export default async function DashboardPage({
         <StatCard
           label="Faturamento do mês"
           value={formatBRL(faturamentoMes)}
-          hint="O que de fato entrou (recebido)"
+          hint="Só Seliga Mídia (sem JC nem reembolso)"
           tone="ledger"
         />
         <StatCard
           label="Custo do mês"
           value={formatBRL(custoMes)}
-          hint="Pago no período"
+          hint="Pago no período (Seliga Mídia)"
           tone="crimson"
         />
         <StatCard
           label="Lucro líquido mês"
           value={formatBRL(saldoMes)}
-          hint="Faturamento − custo"
+          hint="Faturamento − custo (Seliga)"
           tone={saldoMes >= 0 ? "ledger" : "crimson"}
         />
+      </div>
+
+      {/* Total real que entrou — Seliga + JC + reembolso */}
+      <div className="bg-white rounded-md shadow-sm p-5 mt-4">
+        <div className="flex items-baseline justify-between gap-3 flex-wrap">
+          <p className="text-sm font-medium text-ink">Total que entrou no mês</p>
+          <p className="font-mono tabular text-2xl font-semibold text-ledger">
+            {formatBRL(totalEntrouMes)}
+          </p>
+        </div>
+        <p className="text-xs text-muted mt-2">
+          O dinheiro que de fato caiu na conta:{" "}
+          <span className="text-ink">Faturamento Seliga {formatBRL(faturamentoMes)}</span>
+          {jcRecebidoMes > 0 && (
+            <>
+              {" · "}
+              <span className="text-ink">Projeto JC {formatBRL(jcRecebidoMes)}</span>
+            </>
+          )}
+          {Math.abs(reembolsoMes) >= 0.01 && (
+            <>
+              {" · "}
+              <span className="text-ink">Reembolsos {formatBRL(reembolsoMes)}</span>
+            </>
+          )}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-4">
