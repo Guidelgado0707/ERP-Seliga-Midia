@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabaseClient";
 
 type Socio = { id: string; nome: string; percentual_participacao: number; ativo: boolean };
@@ -47,6 +47,8 @@ export default function SociosPage() {
   const [editandoDividendo, setEditandoDividendo] = useState<EditandoDividendo | null>(null);
   const [editandoProLabore, setEditandoProLabore] = useState<EditandoProLabore | null>(null);
 
+  const [mesResumo, setMesResumo] = useState(() => new Date().toISOString().slice(0, 7));
+
   const load = useCallback(async () => {
     setLoading(true);
     const [s, d, pl] = await Promise.all([
@@ -71,6 +73,32 @@ export default function SociosPage() {
   }, [load]);
 
   const totalPercentual = socios.reduce((acc, s) => acc + Number(s.percentual_participacao), 0);
+
+  const anoResumo = mesResumo.slice(0, 4);
+  const resumoGanhos = useMemo(() => {
+    return socios.map((s) => {
+      let plMes = 0, plAno = 0, divMes = 0, divAno = 0;
+      for (const pl of proLabores) {
+        if (pl.socio_id !== s.id || pl.status !== "pago") continue;
+        const d = pl.data_pagamento || pl.data_vencimento;
+        if (!d) continue;
+        if (d.startsWith(anoResumo)) plAno += Number(pl.valor);
+        if (d.startsWith(mesResumo)) plMes += Number(pl.valor);
+      }
+      for (const dist of distribuicoes) {
+        const mref = dist.mes_referencia ?? "";
+        for (const ds of dist.dividendos_socios) {
+          if (ds.socio_id !== s.id || !ds.pago) continue;
+          if (mref.startsWith(anoResumo)) divAno += Number(ds.valor);
+          if (mref.startsWith(mesResumo)) divMes += Number(ds.valor);
+        }
+      }
+      return { socio: s, plMes, plAno, divMes, divAno, totalMes: plMes + divMes, totalAno: plAno + divAno };
+    });
+  }, [socios, proLabores, distribuicoes, mesResumo, anoResumo]);
+
+  const totalGeralMes = resumoGanhos.reduce((a, r) => a + r.totalMes, 0);
+  const totalGeralAno = resumoGanhos.reduce((a, r) => a + r.totalAno, 0);
 
   async function handleAddSocio(e: React.FormEvent) {
     e.preventDefault();
@@ -271,6 +299,73 @@ export default function SociosPage() {
       <div className="mb-6">
         <p className="font-display font-semibold text-xl text-ink">Sócios e Dividendos</p>
         <p className="text-sm text-muted mt-0.5">Participação societária e distribuição de lucros</p>
+      </div>
+
+      {/* Quanto cada sócio ganhou */}
+      <div className="bg-white rounded-md shadow-sm mb-6">
+        <div className="px-5 py-4 border-b border-line flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-medium text-ink">Quanto cada sócio ganhou</p>
+            <p className="text-xs text-muted mt-0.5">Pró-labore pago + dividendos recebidos</p>
+          </div>
+          <input
+            type="month"
+            value={mesResumo}
+            onChange={(e) => setMesResumo(e.target.value)}
+            className="px-3 py-2 rounded-md border border-line text-sm"
+          />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-muted border-b border-line">
+                <th className="text-left font-medium px-5 py-2.5">Sócio</th>
+                <th className="text-right font-medium px-5 py-2.5">No mês</th>
+                <th className="text-right font-medium px-5 py-2.5">No ano ({anoResumo})</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {resumoGanhos.map((r) => (
+                <tr key={r.socio.id}>
+                  <td className="px-5 py-3 font-medium text-ink">{r.socio.nome}</td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="font-mono tabular text-ink">{formatBRL(r.totalMes)}</span>
+                    {r.totalMes > 0 && (
+                      <p className="text-[11px] text-muted mt-0.5">
+                        Pró-labore {formatBRL(r.plMes)} · Dividendos {formatBRL(r.divMes)}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <span className="font-mono tabular text-ink">{formatBRL(r.totalAno)}</span>
+                    {r.totalAno > 0 && (
+                      <p className="text-[11px] text-muted mt-0.5">
+                        Pró-labore {formatBRL(r.plAno)} · Dividendos {formatBRL(r.divAno)}
+                      </p>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {!loading && resumoGanhos.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-5 py-6 text-muted">
+                    Cadastre os sócios pra ver o resumo de ganhos.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+            {resumoGanhos.length > 0 && (
+              <tfoot>
+                <tr className="border-t-2 border-line font-medium">
+                  <td className="px-5 py-3 text-ink">Total</td>
+                  <td className="px-5 py-3 text-right font-mono tabular text-ink">{formatBRL(totalGeralMes)}</td>
+                  <td className="px-5 py-3 text-right font-mono tabular text-ink">{formatBRL(totalGeralAno)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
       </div>
 
       {/* Sócios */}
