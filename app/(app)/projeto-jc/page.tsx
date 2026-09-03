@@ -80,6 +80,15 @@ export default function ProjetoJCPage() {
   const [ajusteValor, setAjusteValor] = useState("");
   const [savingAjuste, setSavingAjuste] = useState(false);
 
+  const [editando, setEditando] = useState<{
+    id: string;
+    tipo: "pagar" | "receber";
+    descricao: string;
+    contraparte: string;
+    valor: string;
+    data_vencimento: string;
+  } | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     const { start, end } = monthValueRange(mes);
@@ -177,6 +186,67 @@ export default function ProjetoJCPage() {
   async function apagarReceber(id: string) {
     if (!confirm("Tem certeza que deseja apagar esta conta? Essa ação não pode ser desfeita.")) return;
     await supabase.from("contas_receber").delete().eq("id", id);
+    load();
+  }
+
+  async function duplicar(l: Lancamento) {
+    if (l.tipo === "pagar") {
+      await supabase.from("contas_pagar").insert({
+        descricao: l.descricao,
+        fornecedor: l.contraparte || null,
+        valor: l.valor,
+        data_vencimento: l.data_vencimento,
+        origem: "projeto_jc",
+      });
+    } else {
+      await supabase.from("contas_receber").insert({
+        descricao: l.descricao,
+        cliente: l.contraparte || "",
+        valor: l.valor,
+        data_vencimento: l.data_vencimento,
+        origem: "projeto_jc",
+      });
+    }
+    load();
+  }
+
+  function iniciarEdicao(l: Lancamento) {
+    setEditando({
+      id: l.id,
+      tipo: l.tipo,
+      descricao: l.descricao,
+      contraparte: l.contraparte || "",
+      valor: String(l.valor),
+      data_vencimento: l.data_vencimento,
+    });
+  }
+
+  async function salvarEdicao() {
+    if (!editando) return;
+    setSaving(true);
+    if (editando.tipo === "pagar") {
+      await supabase
+        .from("contas_pagar")
+        .update({
+          descricao: editando.descricao,
+          fornecedor: editando.contraparte || null,
+          valor: Number(editando.valor),
+          data_vencimento: editando.data_vencimento,
+        })
+        .eq("id", editando.id);
+    } else {
+      await supabase
+        .from("contas_receber")
+        .update({
+          descricao: editando.descricao,
+          cliente: editando.contraparte || "",
+          valor: Number(editando.valor),
+          data_vencimento: editando.data_vencimento,
+        })
+        .eq("id", editando.id);
+    }
+    setSaving(false);
+    setEditando(null);
     load();
   }
 
@@ -466,30 +536,79 @@ export default function ProjetoJCPage() {
           </p>
         )}
         <div className="divide-y divide-line">
-          {lancamentosFiltrados.map((l) => (
-            <div key={`${l.tipo}-${l.id}`} className="px-5 py-3.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-ink truncate">
-                  {l.descricao}
-                  <span
-                    className={`ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                      l.tipo === "pagar" ? "bg-crimson-soft text-crimson" : "bg-ledger-soft text-ledger-dark"
-                    }`}
-                  >
-                    {l.tipo === "pagar" ? "A PAGAR" : "A RECEBER"}
-                  </span>
-                </p>
-                <p className="text-xs text-muted">
-                  {l.contraparte || "—"} · vence em{" "}
-                  {new Date(l.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 flex-wrap sm:shrink-0">
-                <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(l.valor))}</span>
-                <StatusBadge status={l.status} />
-                {l.tipo === "pagar" ? (
-                  <>
-                    {l.status !== "pago" ? (
+          {lancamentosFiltrados.map((l) => {
+            const emEdicao = editando?.id === l.id && editando.tipo === l.tipo;
+
+            if (emEdicao) {
+              return (
+                <div key={`${l.tipo}-${l.id}`} className="px-5 py-3.5 bg-paper/60">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      value={editando.descricao}
+                      onChange={(e) => setEditando({ ...editando, descricao: e.target.value })}
+                      placeholder="Descrição"
+                      className="px-3 py-2 rounded-md border border-line text-sm sm:col-span-2"
+                    />
+                    <input
+                      value={editando.contraparte}
+                      onChange={(e) => setEditando({ ...editando, contraparte: e.target.value })}
+                      placeholder={l.tipo === "pagar" ? "Fornecedor" : "Cliente"}
+                      className="px-3 py-2 rounded-md border border-line text-sm"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editando.valor}
+                      onChange={(e) => setEditando({ ...editando, valor: e.target.value })}
+                      placeholder="Valor (R$)"
+                      className="px-3 py-2 rounded-md border border-line text-sm font-mono"
+                    />
+                    <input
+                      type="date"
+                      value={editando.data_vencimento}
+                      onChange={(e) => setEditando({ ...editando, data_vencimento: e.target.value })}
+                      className="px-3 py-2 rounded-md border border-line text-sm sm:col-span-2"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 mt-2">
+                    <button
+                      onClick={salvarEdicao}
+                      disabled={saving}
+                      className="text-xs font-medium text-white bg-ledger hover:bg-ledger-dark px-3 py-1.5 rounded-md disabled:opacity-60"
+                    >
+                      {saving ? "Salvando..." : "Salvar"}
+                    </button>
+                    <button onClick={() => setEditando(null)} className="text-xs font-medium text-muted hover:underline">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div key={`${l.tipo}-${l.id}`} className="px-5 py-3.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-ink truncate">
+                    {l.descricao}
+                    <span
+                      className={`ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                        l.tipo === "pagar" ? "bg-crimson-soft text-crimson" : "bg-ledger-soft text-ledger-dark"
+                      }`}
+                    >
+                      {l.tipo === "pagar" ? "A PAGAR" : "A RECEBER"}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted">
+                    {l.contraparte || "—"} · vence em{" "}
+                    {new Date(l.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap sm:shrink-0">
+                  <span className="font-mono tabular text-sm text-ink">{formatBRL(Number(l.valor))}</span>
+                  <StatusBadge status={l.status} />
+                  {l.tipo === "pagar" ? (
+                    l.status !== "pago" ? (
                       <button onClick={() => marcarComoPago(l.id)} className="text-xs font-medium text-ledger-dark hover:underline">
                         Marcar pago
                       </button>
@@ -497,30 +616,32 @@ export default function ProjetoJCPage() {
                       <button onClick={() => desfazerPagamento(l.id)} className="text-xs font-medium text-amber hover:underline">
                         Desfazer
                       </button>
-                    )}
-                    <button onClick={() => apagarPagar(l.id)} className="text-xs font-medium text-crimson hover:underline">
-                      Apagar
+                    )
+                  ) : l.status !== "recebido" ? (
+                    <button onClick={() => marcarComoRecebido(l.id)} className="text-xs font-medium text-ledger-dark hover:underline">
+                      Marcar recebido
                     </button>
-                  </>
-                ) : (
-                  <>
-                    {l.status !== "recebido" ? (
-                      <button onClick={() => marcarComoRecebido(l.id)} className="text-xs font-medium text-ledger-dark hover:underline">
-                        Marcar recebido
-                      </button>
-                    ) : (
-                      <button onClick={() => desfazerRecebimento(l.id)} className="text-xs font-medium text-amber hover:underline">
-                        Desfazer
-                      </button>
-                    )}
-                    <button onClick={() => apagarReceber(l.id)} className="text-xs font-medium text-crimson hover:underline">
-                      Apagar
+                  ) : (
+                    <button onClick={() => desfazerRecebimento(l.id)} className="text-xs font-medium text-amber hover:underline">
+                      Desfazer
                     </button>
-                  </>
-                )}
+                  )}
+                  <button onClick={() => iniciarEdicao(l)} className="text-xs font-medium text-ink hover:underline">
+                    Editar
+                  </button>
+                  <button onClick={() => duplicar(l)} className="text-xs font-medium text-ledger-dark hover:underline">
+                    Duplicar
+                  </button>
+                  <button
+                    onClick={() => (l.tipo === "pagar" ? apagarPagar(l.id) : apagarReceber(l.id))}
+                    className="text-xs font-medium text-crimson hover:underline"
+                  >
+                    Apagar
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
