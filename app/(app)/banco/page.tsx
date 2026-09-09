@@ -93,8 +93,8 @@ function BancoConteudo() {
           : `Erro HTTP ${data.httpStatus}: ${data.error ?? JSON.stringify(data.rawResponse)}`,
         elapsed: data.elapsedMs ?? 0,
       });
-      // sobrescreve o tokenPrefix para mostrar o campo certo em logs futuros
-      if (tokenVal) console.log("C6 token field:", tokenKey, "| prefix:", tokenVal.slice(0, 30));
+      // (não logamos o prefixo do bearer aqui pra não vazar no DevTools de
+      // quem abrir a aba — era um debug do sandbox, removido em prod)
     } catch (e) {
       setAuthTest({ ok: false, msg: String(e), elapsed: 0 });
     } finally {

@@ -19,6 +19,10 @@ const nextConfig = {
           // desliga acesso a APIs sensíveis do navegador (câmera, microfone,
           // geolocalização) que o ERP não usa
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          // força o navegador a nunca aceitar HTTP puro pro nosso domínio,
+          // por 2 anos, incluindo subdomínios — bloqueia downgrade de HTTPS
+          // (a Vercel já serve tudo em HTTPS; isso "sela" no navegador)
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
         ],
       },
     ];

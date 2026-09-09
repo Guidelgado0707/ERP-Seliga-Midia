@@ -34,6 +34,11 @@ function httpsRequest(
 }
 
 export async function GET(request: NextRequest) {
+  // rota de diagnóstico — só existe em sandbox. Em produção respondemos 404
+  // pra não dar superfície de ataque desnecessária.
+  if (process.env.C6_SANDBOX !== "true") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   if (!tokenValido(request.headers.get("x-banco-pin-token"))) {
     return NextResponse.json({ error: "PIN não verificado ou expirado" }, { status: 401 });
   }
