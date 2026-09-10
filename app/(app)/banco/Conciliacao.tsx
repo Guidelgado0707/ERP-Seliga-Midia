@@ -198,9 +198,12 @@ export default function Conciliacao() {
     const ref = txRef(tx);
     if (!ref) return;
     setAvulsoAberto(ref);
+    // saídas: default operacional (não tem "reembolso" pra pagar).
+    // entradas: default reembolso (caso mais comum de tx sem match).
+    const isOut = tx.operation_type === "OUTGOING";
     setAvulsoForm({
       descricao: txDescription(tx) || "",
-      tipo: "reembolso",
+      tipo: isOut ? "operacional" : "reembolso",
       categoria_id: "",
     });
   }
@@ -221,6 +224,10 @@ export default function Conciliacao() {
       const categoria_id = avulsoForm.tipo === "operacional" && avulsoForm.categoria_id ? avulsoForm.categoria_id : null;
 
       if (isOut) {
+        // contas_pagar não tem coluna `reembolso` (só contas_receber tem).
+        // Faz sentido: "reembolso" pra saída é raro. Se um dia precisar
+        // classificar saída como "não afeta DRE", adiciona a coluna via
+        // migration e trata aqui.
         const { error } = await supabase.from("contas_pagar").insert({
           descricao,
           valor,
@@ -231,7 +238,6 @@ export default function Conciliacao() {
           origem: "seliga_midia",
           categoria_id,
           banco_referencia: ref,
-          reembolso: avulsoForm.tipo === "reembolso",
         });
         if (error) throw error;
       } else {
@@ -534,16 +540,25 @@ export default function Conciliacao() {
                           </div>
                           <div>
                             <label className="text-[11px] text-muted block mb-1">Tipo</label>
-                            <select
-                              value={avulsoForm.tipo}
-                              onChange={(e) => setAvulsoForm({ ...avulsoForm, tipo: e.target.value as "reembolso" | "operacional", categoria_id: "" })}
-                              className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
-                            >
-                              <option value="reembolso">Reembolso (não afeta DRE)</option>
-                              <option value="operacional">Operacional (entra na DRE)</option>
-                            </select>
+                            {isOut ? (
+                              <input
+                                readOnly
+                                value="Operacional (entra na DRE)"
+                                title="Saídas só entram como operacional — flag 'reembolso' é só de entradas."
+                                className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-gray-50 text-muted"
+                              />
+                            ) : (
+                              <select
+                                value={avulsoForm.tipo}
+                                onChange={(e) => setAvulsoForm({ ...avulsoForm, tipo: e.target.value as "reembolso" | "operacional", categoria_id: "" })}
+                                className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
+                              >
+                                <option value="reembolso">Reembolso (não afeta DRE)</option>
+                                <option value="operacional">Operacional (entra na DRE)</option>
+                              </select>
+                            )}
                           </div>
-                          {avulsoForm.tipo === "operacional" && (
+                          {(isOut || avulsoForm.tipo === "operacional") && (
                             <div className="md:col-span-3">
                               <label className="text-[11px] text-muted block mb-1">Categoria (opcional)</label>
                               <select
