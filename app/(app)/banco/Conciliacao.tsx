@@ -75,6 +75,11 @@ export default function Conciliacao() {
   const [jaConciliadosCount, setJaConciliadosCount] = useState(0);
   const [escolha, setEscolha] = useState<Record<string, string>>({}); // txRef -> contaId
   const [confirmando, setConfirmando] = useState<string | null>(null);
+  // guarda TODAS as contas em aberto pra o usuário poder escolher qualquer uma,
+  // mesmo que o valor não bata exatamente (às vezes cai com desconto/taxa,
+  // ou o sistema sugere errado quando 2 contas tem o mesmo valor)
+  const [todasPagar, setTodasPagar] = useState<ContaRow[]>([]);
+  const [todasReceber, setTodasReceber] = useState<ContaRow[]>([]);
 
   const buscar = useCallback(async () => {
     setLoading(true);
@@ -121,6 +126,8 @@ export default function Conciliacao() {
       ]);
       const contasPagar: ContaRow[] = pagarRes.data ?? [];
       const contasReceber: ContaRow[] = receberRes.data ?? [];
+      setTodasPagar(contasPagar);
+      setTodasReceber(contasReceber);
 
       const novasSugestoes: Sugestao[] = [];
       const novoSemMatch: C6Transaction[] = [];
@@ -158,6 +165,15 @@ export default function Conciliacao() {
       setLoading(false);
     }
   }, [start, end, supabase, pinToken]);
+
+  // move uma tx da lista de sugestões pra "sem match" quando o usuário
+  // diz que a sugestão automática não corresponde à origem real do dinheiro
+  // (ex: valor bateu por coincidência com Hyundai mas quem pagou foi outro)
+  function rejeitarSugestao(tx: C6Transaction) {
+    const ref = txRef(tx);
+    setSugestoes((prev) => prev.filter((s) => txRef(s.tx) !== ref));
+    setSemMatch((prev) => [...prev, tx]);
+  }
 
   async function confirmar(tx: C6Transaction, candidato: Candidato) {
     const ref = txRef(tx);
@@ -288,45 +304,93 @@ export default function Conciliacao() {
 
                       <span className="text-muted text-sm shrink-0">↔</span>
 
-                      {/* candidato(s) na contas a pagar/receber */}
+                      {/* candidato(s) na contas a pagar/receber — sempre um select com TODAS
+                          as contas em aberto na direção certa, pra permitir trocar quando o
+                          match automático foi errado (ex: valor bateu com Hyundai por
+                          coincidência mas quem pagou foi outro cliente). */}
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {s.candidatos.length > 1 ? (
-                          <select
-                            value={escolhidoId}
-                            onChange={(e) =>
-                              setEscolha((prev) => ({ ...prev, [ref]: e.target.value }))
-                            }
-                            className="border border-line rounded-md px-2 py-1.5 text-sm max-w-full"
-                          >
-                            {s.candidatos.map((c) => (
-                              <option key={c.conta.id} value={c.conta.id}>
-                                {c.conta.descricao} ({c.conta.fornecedor ?? c.conta.cliente ?? "—"}) ·{" "}
-                                venc. {fmtDate(c.conta.data_vencimento)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="min-w-0">
-                            <p className="text-sm text-ink truncate">
-                              {candidatoEscolhido.conta.descricao}
-                            </p>
-                            <p className="text-xs text-muted">
-                              {candidatoEscolhido.conta.fornecedor ??
-                                candidatoEscolhido.conta.cliente ??
-                                "—"}{" "}
-                              · venc. {fmtDate(candidatoEscolhido.conta.data_vencimento)}
-                            </p>
-                          </div>
-                        )}
+                        {(() => {
+                          const idsCandidatos = new Set(s.candidatos.map((c) => c.conta.id));
+                          const outras = (isOut ? todasPagar : todasReceber).filter(
+                            (c) => !idsCandidatos.has(c.id),
+                          );
+                          const contaEscolhidaEhCandidata = idsCandidatos.has(escolhidoId);
+                          // contaEscolhida pode estar em `outras` também (o usuário trocou)
+                          const contaEscolhida =
+                            (contaEscolhidaEhCandidata
+                              ? s.candidatos.find((c) => c.conta.id === escolhidoId)?.conta
+                              : outras.find((c) => c.id === escolhidoId)) ??
+                            candidatoEscolhido.conta;
+                          const valorConta = Number(contaEscolhida.valor);
+                          const valorTx = txAmount(s.tx);
+                          const bate = Math.abs(valorConta - valorTx) < 0.01;
+                          return (
+                            <div className="min-w-0 flex-1">
+                              <select
+                                value={escolhidoId}
+                                onChange={(e) =>
+                                  setEscolha((prev) => ({ ...prev, [ref]: e.target.value }))
+                                }
+                                className="w-full border border-line rounded-md px-2 py-1.5 text-sm"
+                              >
+                                <optgroup label="Sugestão (valor igual)">
+                                  {s.candidatos.map((c) => (
+                                    <option key={c.conta.id} value={c.conta.id}>
+                                      {c.conta.descricao} ({c.conta.fornecedor ?? c.conta.cliente ?? "—"}) ·{" "}
+                                      venc. {fmtDate(c.conta.data_vencimento)}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                                {outras.length > 0 && (
+                                  <optgroup label="Outras contas em aberto">
+                                    {outras.map((c) => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.descricao} ({c.fornecedor ?? c.cliente ?? "—"}) ·{" "}
+                                        {fmtBRL(Number(c.valor))} · venc.{" "}
+                                        {fmtDate(c.data_vencimento)}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                              </select>
+                              {!bate && (
+                                <p className="text-[11px] text-amber-700 mt-1">
+                                  ⚠ valor da conta ({fmtBRL(valorConta)}) diferente do banco (
+                                  {fmtBRL(valorTx)}). Ao confirmar, a conta é marcada como paga/recebida
+                                  com o valor da conta — se precisar ajustar, edite depois na tela A Pagar/Receber.
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
-                      <button
-                        onClick={() => confirmar(s.tx, candidatoEscolhido)}
-                        disabled={confirmando === ref}
-                        className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 shrink-0"
-                      >
-                        {confirmando === ref ? "Confirmando…" : "✓ Confirmar"}
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => {
+                            const cId = escolhidoId;
+                            const cAtual =
+                              s.candidatos.find((c) => c.conta.id === cId) ??
+                              (isOut
+                                ? { tipo: "pagar" as const, conta: todasPagar.find((c) => c.id === cId)! }
+                                : { tipo: "receber" as const, conta: todasReceber.find((c) => c.id === cId)! });
+                            if (!cAtual?.conta) return;
+                            confirmar(s.tx, cAtual);
+                          }}
+                          disabled={confirmando === ref}
+                          className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                        >
+                          {confirmando === ref ? "Confirmando…" : "✓ Confirmar"}
+                        </button>
+                        <button
+                          onClick={() => rejeitarSugestao(s.tx)}
+                          disabled={confirmando === ref}
+                          title="Nenhuma dessas — trata manualmente"
+                          className="px-2.5 py-1.5 rounded-md border border-line text-crimson text-xs font-medium hover:bg-crimson-soft transition-colors disabled:opacity-50"
+                        >
+                          ✕ Não é essa
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
