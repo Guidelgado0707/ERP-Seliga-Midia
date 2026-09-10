@@ -47,10 +47,9 @@ export default function PixEnviar() {
   return (
     <div className="space-y-4">
       {/* aviso — PIX real */}
-      <div className="bg-crimson-soft border border-crimson/30 rounded-xl p-3.5 text-sm text-crimson-dark">
-        ⚠️ <strong>PIX real.</strong> Movimento dinheiro de verdade da conta C6. Confira valor
-        e destinatário antes de confirmar. Todo envio é auditado e notifica todos os sócios por
-        e-mail.
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-sm text-amber-900 space-y-1">
+        <p><strong>⚠️ Como funciona:</strong> quando você envia por aqui, o sistema submete o PIX pro C6 pra aprovação. <strong>O dinheiro só sai depois que alguém entra no app/Web Banking do C6 e aprova</strong>.</p>
+        <p className="text-xs">Isso é uma exigência do próprio C6 pra segurança (não dá pra pular). Todo envio é auditado e notifica os sócios por e-mail.</p>
       </div>
 
       {/* sub-abas */}
@@ -154,7 +153,7 @@ function PainelEnviar({ pinToken, onEnviado }: { pinToken: string | null; onEnvi
 
       setMsg({
         tipo: "ok",
-        texto: `✅ PIX enviado! endToEnd: ${dataEnv.endToEnd ?? "(sem retorno)"}. Notificação por e-mail disparada.`,
+        texto: `✅ PIX submetido ao C6 (group_id ${dataEnv.endToEnd ?? "?"}). AGORA VÁ NO APP/WEB BANKING DO C6 pra aprovar o pagamento — o dinheiro só sai após esse clique. Notificação por e-mail disparada.`,
       });
       setValor("");
       setDescricao("");
@@ -296,7 +295,7 @@ function PainelPendentes({ pinToken }: { pinToken: string | null }) {
       });
       const d = await res.json();
       if (!res.ok || !d.ok) throw new Error(d.error ?? `HTTP ${res.status}`);
-      alert(`✅ PIX enviado! endToEnd: ${d.endToEnd ?? "(sem retorno)"}`);
+      alert(`✅ PIX submetido ao C6 (group_id ${d.endToEnd ?? "?"}).\n\nAGORA vá no app/Web Banking do C6 e aprove o pagamento — o dinheiro só sai após esse clique.`);
       await carregar();
     } catch (e) {
       alert(`Erro: ${(e as Error).message}`);

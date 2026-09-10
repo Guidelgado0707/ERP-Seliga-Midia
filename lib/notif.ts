@@ -62,17 +62,22 @@ export function msgPixEnviado(params: {
   end_to_end_id?: string;
 }): { assunto: string; corpo: string } {
   const valorFmt = params.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const assunto = `🏦 PIX enviado — ${valorFmt} pra ${params.destinatario}`;
+  const assunto = `🏦 PIX submetido ao C6 — ${valorFmt} pra ${params.destinatario}`;
   const linhas = [
-    `Um PIX acabou de sair da conta da Seliga Mídia (C6):`,
+    `Um PIX foi submetido pra aprovação no C6 (Seliga Mídia):`,
     ``,
     `Valor: ${valorFmt}`,
     `Destinatário: ${params.destinatario}`,
   ];
   if (params.descricao) linhas.push(`Motivo: ${params.descricao}`);
   linhas.push(`Pediu: ${params.pedido_por}`);
-  if (params.aprovado_por) linhas.push(`Aprovou: ${params.aprovado_por}`);
-  if (params.end_to_end_id) linhas.push(``, `ID C6 (endToEnd): ${params.end_to_end_id}`);
-  linhas.push(``, `Se você NÃO reconhece esse PIX, fale AGORA com o Guilherme e trave a conta no C6.`);
+  if (params.aprovado_por) linhas.push(`Aprovou no sistema: ${params.aprovado_por}`);
+  if (params.end_to_end_id) linhas.push(``, `ID do grupo no C6: ${params.end_to_end_id}`);
+  linhas.push(
+    ``,
+    `⚠️ O dinheiro NÃO saiu ainda. Pra efetivar, alguém precisa entrar no app/Web Banking do C6 e aprovar o lote.`,
+    ``,
+    `Se você NÃO reconhece esse PIX, NÃO APROVE no C6 e fale AGORA com o Guilherme.`,
+  );
   return { assunto, corpo: linhas.join("\n") };
 }

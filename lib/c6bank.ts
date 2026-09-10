@@ -252,42 +252,55 @@ export async function createPixCharge(params: {
   return { status: res.status, body: parsed, requestBody: payload };
 }
 
-// ---------- PIX (envio) — ENVIAR DINHEIRO ----------
+// ---------- PIX (envio) — Agendamento de Pagamentos ----------
 
 /**
- * Envia PIX pra uma chave (transferência de saída). Diferente do
- * createPixCharge, que só CRIA uma cobrança pra alguém pagar; esse
- * aqui tira dinheiro real da conta.
+ * A API oficial do C6 pra enviar PIX (produção) é a "Agendamento de
+ * Pagamentos" — path /v1/schedule_payments/. NÃO é o /banking/pix/*
+ * que eu chutei antes (esse não existe).
  *
- * ATENÇÃO: endpoint pode variar por versão da API do C6. Configurável
- * por env C6_PIX_ENVIO_PATH — default "/banking/v1/pix/payments" que
- * é o padrão BaaS que o C6 documentou. Se der 404 em produção, ajusta
- * a env pro path correto sem precisar de redeploy de código.
+ * O fluxo do C6 é em 2 etapas, e o BANCO NÃO PAGA SOZINHO:
+ *   1. POST /decode  → cria grupo, C6 valida chave PIX e retorna group_id
+ *   2. POST /submit  → submete o grupo pra aprovação humana no Web Banking
+ *
+ * Depois do submit, o C6 exige que ALGUÉM entre no Web Banking do C6
+ * e clique "aprovar" pra o dinheiro efetivamente sair. Isso é uma escolha
+ * de segurança do próprio banco (fonte: doc oficial do C6, seção
+ * "Agendamento de Pagamentos"). Ou seja: o sistema faz solicitação +
+ * pré-processamento; a aprovação final é sempre humana no C6.
+ *
+ * https://developers.c6bank.com.br/apis/schedule-payments
  */
-export async function enviarPix(params: {
-  chave: string;                 // chave do destinatário
-  tipoChave: "cpf" | "cnpj" | "email" | "telefone" | "aleatoria";
-  valor: number;                 // em reais, com 2 casas (ex: 100.50)
-  descricao?: string;            // aparece pro destinatário
-  endToEndId?: string;           // opcional — se não passar, C6 gera
-  clientRequestId: string;       // idempotência: mesmo id = mesma tx
-}): Promise<{ status: number; body: unknown; requestBody: unknown }> {
+
+const SCHEDULE_BASE = "/v1/schedule_payments";
+const PARTNER_NAME = "gestao-seliga-midia";
+const PARTNER_VERSION = "1.0.0";
+
+/**
+ * Etapa 1: envia um único item PIX pro /decode do C6. Retorna group_id.
+ */
+export async function decodePix(params: {
+  chave: string;         // conteúdo do "content" (chave PIX)
+  valor: number;         // em reais (ex: 100.50)
+  descricao?: string;
+  payerName?: string;    // aparece no Web Banking, referência da Seliga
+}): Promise<{ status: number; body: unknown; groupId: string | null; requestBody: unknown }> {
   const { cert, key } = getPem();
   const token = await getToken();
 
-  const path = process.env.C6_PIX_ENVIO_PATH ?? "/banking/v1/pix/payments";
-
   const payload = {
-    amount: params.valor.toFixed(2),
-    key: params.chave,
-    keyType: params.tipoChave.toUpperCase(),
-    description: params.descricao ?? "PIX Seliga Mídia",
-    ...(params.endToEndId ? { endToEndId: params.endToEndId } : {}),
-    clientRequestId: params.clientRequestId,
+    items: [
+      {
+        content: params.chave,
+        amount: Number(params.valor.toFixed(2)),
+        ...(params.descricao ? { description: params.descricao.slice(0, 140) } : {}),
+        ...(params.payerName ? { payer_name: params.payerName } : {}),
+      },
+    ],
   };
 
   const body = JSON.stringify(payload);
-  const url = `${C6_BASE}${path}`;
+  const url = `${C6_BASE}${SCHEDULE_BASE}/decode`;
 
   const res = await httpsRequest(
     url,
@@ -298,9 +311,59 @@ export async function enviarPix(params: {
         "Content-Type": "application/json",
         "Content-Length": Buffer.byteLength(body).toString(),
         Accept: "application/json",
-        // idempotência via header (padrão de vários bancos): mesmo id no header
-        // = C6 rejeita duplicação. Usamos o mesmo clientRequestId.
-        "x-c6-idempotency-key": params.clientRequestId,
+        "partner-software-name": PARTNER_NAME,
+        "partner-software-version": PARTNER_VERSION,
+      },
+      cert,
+      key,
+    },
+    body,
+  );
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(res.body);
+  } catch {
+    parsed = res.body;
+  }
+  const groupId =
+    parsed && typeof parsed === "object" && "group_id" in parsed
+      ? String((parsed as { group_id?: unknown }).group_id ?? "")
+      : null;
+
+  return { status: res.status, body: parsed, groupId, requestBody: payload };
+}
+
+/**
+ * Etapa 2: submete o grupo pra aprovação no Web Banking.
+ * Depois disso, o C6 exige aprovação humana no app/web pra efetivar.
+ */
+export async function submitLote(params: {
+  groupId: string;
+  uploaderName: string; // aparece na tela de aprovação do Web Banking
+}): Promise<{ status: number; body: unknown; requestBody: unknown }> {
+  const { cert, key } = getPem();
+  const token = await getToken();
+
+  const payload = {
+    group_id: params.groupId,
+    uploader_name: params.uploaderName.slice(0, 60),
+  };
+
+  const body = JSON.stringify(payload);
+  const url = `${C6_BASE}${SCHEDULE_BASE}/submit`;
+
+  const res = await httpsRequest(
+    url,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body).toString(),
+        Accept: "application/json",
+        "partner-software-name": PARTNER_NAME,
+        "partner-software-version": PARTNER_VERSION,
       },
       cert,
       key,
