@@ -4,6 +4,7 @@ import MonthFilter from "@/components/MonthFilter";
 import YearFilter from "@/components/YearFilter";
 import RefreshButton from "@/components/RefreshButton";
 import CaixaCard from "@/components/CaixaCard";
+import SaldoBancoCard from "@/components/SaldoBancoCard";
 import ComparativoStat from "@/components/ComparativoStat";
 import YearComparativoChart, { type SerieAno } from "@/components/YearComparativoChart";
 
@@ -429,6 +430,14 @@ export default async function DashboardPage({
           </div>
         </div>
       )}
+
+      {/* Banco C6 — saldo real e movimento do mês */}
+      <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
+        <p className="text-xs font-medium text-muted uppercase tracking-wide">Banco C6 (extrato real)</p>
+      </div>
+      <div className="mb-6">
+        <SaldoBancoCard />
+      </div>
 
       {/* Ano */}
       <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
