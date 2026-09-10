@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { C6Transaction } from "@/lib/c6bank";
 import Conciliacao from "./Conciliacao";
+import PixEnviar from "./PixEnviar";
 import PinGate, { useBancoPinToken } from "./PinGate";
 
 // ---------- helpers ----------
@@ -54,7 +55,7 @@ function addDays(dateStr: string, n: number) {
 
 function BancoConteudo() {
   const pinToken = useBancoPinToken();
-  const [tab, setTab] = useState<"extrato" | "conciliacao">("extrato");
+  const [tab, setTab] = useState<"extrato" | "conciliacao" | "pix">("extrato");
 
   // Limite confirmado por teste real: o gateway C6 aceita no máximo 30 dias
   // corridos entre start_date e end_date (acima disso, HTTP 500 RF-InvalidRequest).
@@ -141,8 +142,7 @@ function BancoConteudo() {
         <div>
           <h1 className="text-2xl font-display font-bold text-ink">Banco C6</h1>
           <p className="text-sm text-muted mt-0.5">
-            Conta PJ · Sandbox{" "}
-            <span className="text-amber-600 font-medium">(ambiente de testes)</span>
+            Conta PJ · <span className="text-emerald-700 font-medium">Produção</span>
           </p>
         </div>
       </div>
@@ -169,10 +169,22 @@ function BancoConteudo() {
         >
           Conciliação
         </button>
+        <button
+          onClick={() => setTab("pix")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === "pix"
+              ? "border-ledger text-ledger"
+              : "border-transparent text-muted hover:text-ink"
+          }`}
+        >
+          Enviar PIX
+        </button>
       </div>
 
       {tab === "conciliacao" ? (
         <Conciliacao />
+      ) : tab === "pix" ? (
+        <PixEnviar />
       ) : (
         <>
       {/* filtro de período */}
