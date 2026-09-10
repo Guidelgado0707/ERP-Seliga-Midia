@@ -81,6 +81,16 @@ export default function Conciliacao() {
   const [todasPagar, setTodasPagar] = useState<ContaRow[]>([]);
   const [todasReceber, setTodasReceber] = useState<ContaRow[]>([]);
 
+  // categorias pra classificar lançamento avulso operacional (na seção "sem match")
+  const [categoriasPagar, setCategoriasPagar] = useState<{ id: string; nome: string }[]>([]);
+  const [categoriasReceber, setCategoriasReceber] = useState<{ id: string; nome: string }[]>([]);
+  // qual tx da lista "sem match" tem form aberto + o rascunho dele
+  const [avulsoAberto, setAvulsoAberto] = useState<string | null>(null);
+  const [avulsoForm, setAvulsoForm] = useState<{ descricao: string; tipo: "reembolso" | "operacional"; categoria_id: string }>({
+    descricao: "", tipo: "reembolso", categoria_id: "",
+  });
+  const [registrandoAvulso, setRegistrandoAvulso] = useState(false);
+
   const buscar = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -129,6 +139,15 @@ export default function Conciliacao() {
       setTodasPagar(contasPagar);
       setTodasReceber(contasReceber);
 
+      // categorias — usadas quando o usuário registra um lançamento avulso operacional
+      // (pra classificar direto na DRE). Reembolso não precisa.
+      const [catPagarRes, catReceberRes] = await Promise.all([
+        supabase.from("categorias").select("id, nome").in("tipo", ["pagar", "ambos"]).order("nome"),
+        supabase.from("categorias").select("id, nome").in("tipo", ["receber", "ambos"]).order("nome"),
+      ]);
+      setCategoriasPagar(catPagarRes.data ?? []);
+      setCategoriasReceber(catReceberRes.data ?? []);
+
       const novasSugestoes: Sugestao[] = [];
       const novoSemMatch: C6Transaction[] = [];
 
@@ -173,6 +192,73 @@ export default function Conciliacao() {
     const ref = txRef(tx);
     setSugestoes((prev) => prev.filter((s) => txRef(s.tx) !== ref));
     setSemMatch((prev) => [...prev, tx]);
+  }
+
+  function abrirAvulso(tx: C6Transaction) {
+    const ref = txRef(tx);
+    if (!ref) return;
+    setAvulsoAberto(ref);
+    setAvulsoForm({
+      descricao: txDescription(tx) || "",
+      tipo: "reembolso",
+      categoria_id: "",
+    });
+  }
+
+  // Cria uma conta_pagar/receber já como paga/recebida, vinculada à tx do banco
+  // (banco_referencia = ref, pra não sugerir de novo). Se for reembolso, marca
+  // a flag e DRE/Painel automaticamente ignoram (já filtram por reembolso=false).
+  async function registrarAvulso(tx: C6Transaction) {
+    const ref = txRef(tx);
+    if (!ref) return;
+    setRegistrandoAvulso(true);
+    try {
+      const isOut = tx.operation_type === "OUTGOING";
+      const valor = txAmount(tx);
+      const data = txDate(tx) || new Date().toISOString().slice(0, 10);
+      const nowIso = new Date().toISOString();
+      const descricao = (avulsoForm.descricao || txDescription(tx) || "Lançamento avulso").slice(0, 200);
+      const categoria_id = avulsoForm.tipo === "operacional" && avulsoForm.categoria_id ? avulsoForm.categoria_id : null;
+
+      if (isOut) {
+        const { error } = await supabase.from("contas_pagar").insert({
+          descricao,
+          valor,
+          data_vencimento: data,
+          data_pagamento: data,
+          pago_em: nowIso,
+          status: "pago",
+          origem: "seliga_midia",
+          categoria_id,
+          banco_referencia: ref,
+          reembolso: avulsoForm.tipo === "reembolso",
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("contas_receber").insert({
+          descricao,
+          cliente: "—",
+          valor,
+          data_vencimento: data,
+          data_recebimento: data,
+          recebido_em: nowIso,
+          status: "recebido",
+          origem: "seliga_midia",
+          categoria_id,
+          banco_referencia: ref,
+          reembolso: avulsoForm.tipo === "reembolso",
+        });
+        if (error) throw error;
+      }
+      // tira da lista de sem match e limpa form
+      setSemMatch((prev) => prev.filter((t) => txRef(t) !== ref));
+      setAvulsoAberto(null);
+      setAvulsoForm({ descricao: "", tipo: "reembolso", categoria_id: "" });
+    } catch (e) {
+      alert(`Erro ao registrar: ${(e as Error).message}`);
+    } finally {
+      setRegistrandoAvulso(false);
+    }
   }
 
   async function confirmar(tx: C6Transaction, candidato: Candidato) {
@@ -406,40 +492,98 @@ export default function Conciliacao() {
               </h2>
               <div className="bg-amber-50 border border-amber-200 rounded-xl divide-y divide-amber-200 overflow-hidden">
                 {semMatch.map((tx, i) => {
+                  const ref = txRef(tx) ?? String(i);
                   const isOut = tx.operation_type === "OUTGOING";
+                  const abertoAqui = avulsoAberto === ref;
+                  const catList = isOut ? categoriasPagar : categoriasReceber;
                   return (
-                    <div
-                      key={txRef(tx) ?? i}
-                      className="p-3.5 flex items-center gap-3"
-                    >
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          isOut ? "bg-crimson" : "bg-emerald-500"
-                        }`}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-ink truncate">
-                          {txDescription(tx)}
-                        </p>
-                        <p className="text-xs text-amber-700">
-                          {fmtDate(txDate(tx))} · nenhuma conta {isOut ? "a pagar" : "a receber"}{" "}
-                          pendente com esse valor
-                        </p>
+                    <div key={ref} className="p-3.5">
+                      <div className="flex items-center gap-3">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${isOut ? "bg-crimson" : "bg-emerald-500"}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-ink truncate">
+                            {txDescription(tx)}
+                          </p>
+                          <p className="text-xs text-amber-700">
+                            {fmtDate(txDate(tx))} · nenhuma conta {isOut ? "a pagar" : "a receber"}{" "}
+                            pendente com esse valor
+                          </p>
+                        </div>
+                        <span className={`text-sm font-semibold shrink-0 ${isOut ? "text-crimson" : "text-emerald-600"}`}>
+                          {fmtBRL(txAmount(tx))}
+                        </span>
+                        {!abertoAqui && (
+                          <button
+                            onClick={() => abrirAvulso(tx)}
+                            className="px-3 py-1.5 rounded-md bg-ledger text-white text-xs font-medium hover:bg-ledger-dark transition-colors shrink-0"
+                          >
+                            + Registrar
+                          </button>
+                        )}
                       </div>
-                      <span
-                        className={`text-sm font-semibold shrink-0 ${
-                          isOut ? "text-crimson" : "text-emerald-600"
-                        }`}
-                      >
-                        {fmtBRL(txAmount(tx))}
-                      </span>
+                      {abertoAqui && (
+                        <div className="mt-3 pt-3 border-t border-amber-200 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                          <div className="md:col-span-2">
+                            <label className="text-[11px] text-muted block mb-1">Descrição</label>
+                            <input
+                              value={avulsoForm.descricao}
+                              onChange={(e) => setAvulsoForm({ ...avulsoForm, descricao: e.target.value })}
+                              placeholder={isOut ? "Ex: pagamento avulso Fulano" : "Ex: reembolso viagem SP - Fulano"}
+                              className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-muted block mb-1">Tipo</label>
+                            <select
+                              value={avulsoForm.tipo}
+                              onChange={(e) => setAvulsoForm({ ...avulsoForm, tipo: e.target.value as "reembolso" | "operacional", categoria_id: "" })}
+                              className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
+                            >
+                              <option value="reembolso">Reembolso (não afeta DRE)</option>
+                              <option value="operacional">Operacional (entra na DRE)</option>
+                            </select>
+                          </div>
+                          {avulsoForm.tipo === "operacional" && (
+                            <div className="md:col-span-3">
+                              <label className="text-[11px] text-muted block mb-1">Categoria (opcional)</label>
+                              <select
+                                value={avulsoForm.categoria_id}
+                                onChange={(e) => setAvulsoForm({ ...avulsoForm, categoria_id: e.target.value })}
+                                className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
+                              >
+                                <option value="">— sem categoria —</option>
+                                {catList.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                              </select>
+                            </div>
+                          )}
+                          <div className="md:col-span-3 flex gap-2">
+                            <button
+                              onClick={() => registrarAvulso(tx)}
+                              disabled={registrandoAvulso}
+                              className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              {registrandoAvulso ? "Registrando…" : `✓ Registrar como ${isOut ? "pago" : "recebido"}`}
+                            </button>
+                            <button
+                              onClick={() => { setAvulsoAberto(null); }}
+                              className="px-3 py-1.5 rounded-md border border-line text-muted text-xs font-medium hover:bg-white"
+                            >
+                              Cancelar
+                            </button>
+                            {avulsoForm.tipo === "reembolso" && (
+                              <span className="text-[11px] text-muted self-center ml-2">
+                                Marca como reembolso = não conta na DRE nem no Painel
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
               <p className="text-xs text-muted mt-2">
-                Cadastre manualmente em A Pagar/A Receber se fizer sentido, ou ignore se for algo
-                como tarifa bancária.
+                Use <strong>Registrar</strong> pra lançar direto (reembolso não afeta DRE; operacional entra na DRE com a categoria escolhida).
               </p>
             </div>
           )}
