@@ -251,3 +251,69 @@ export async function createPixCharge(params: {
 
   return { status: res.status, body: parsed, requestBody: payload };
 }
+
+// ---------- PIX (envio) — ENVIAR DINHEIRO ----------
+
+/**
+ * Envia PIX pra uma chave (transferência de saída). Diferente do
+ * createPixCharge, que só CRIA uma cobrança pra alguém pagar; esse
+ * aqui tira dinheiro real da conta.
+ *
+ * ATENÇÃO: endpoint pode variar por versão da API do C6. Configurável
+ * por env C6_PIX_ENVIO_PATH — default "/banking/v1/pix/payments" que
+ * é o padrão BaaS que o C6 documentou. Se der 404 em produção, ajusta
+ * a env pro path correto sem precisar de redeploy de código.
+ */
+export async function enviarPix(params: {
+  chave: string;                 // chave do destinatário
+  tipoChave: "cpf" | "cnpj" | "email" | "telefone" | "aleatoria";
+  valor: number;                 // em reais, com 2 casas (ex: 100.50)
+  descricao?: string;            // aparece pro destinatário
+  endToEndId?: string;           // opcional — se não passar, C6 gera
+  clientRequestId: string;       // idempotência: mesmo id = mesma tx
+}): Promise<{ status: number; body: unknown; requestBody: unknown }> {
+  const { cert, key } = getPem();
+  const token = await getToken();
+
+  const path = process.env.C6_PIX_ENVIO_PATH ?? "/banking/v1/pix/payments";
+
+  const payload = {
+    amount: params.valor.toFixed(2),
+    key: params.chave,
+    keyType: params.tipoChave.toUpperCase(),
+    description: params.descricao ?? "PIX Seliga Mídia",
+    ...(params.endToEndId ? { endToEndId: params.endToEndId } : {}),
+    clientRequestId: params.clientRequestId,
+  };
+
+  const body = JSON.stringify(payload);
+  const url = `${C6_BASE}${path}`;
+
+  const res = await httpsRequest(
+    url,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body).toString(),
+        Accept: "application/json",
+        // idempotência via header (padrão de vários bancos): mesmo id no header
+        // = C6 rejeita duplicação. Usamos o mesmo clientRequestId.
+        "x-c6-idempotency-key": params.clientRequestId,
+      },
+      cert,
+      key,
+    },
+    body,
+  );
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(res.body);
+  } catch {
+    parsed = res.body;
+  }
+
+  return { status: res.status, body: parsed, requestBody: payload };
+}
