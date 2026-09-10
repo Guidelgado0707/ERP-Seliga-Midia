@@ -92,8 +92,10 @@ export async function GET() {
       if (!d) continue;
       const valor = n(tx);
       const isOut = tx.operation_type === "OUTGOING";
-      // desde a data de referência (inclusive) — usada pro cálculo do saldo
-      if (d >= snap.data_ref) {
+      // ESTRITAMENTE depois de data_ref — assumimos que o saldo informado já
+      // reflete todas as transações do dia da referência (fim do dia). Se
+      // somássemos as do próprio dia, contaríamos duas vezes.
+      if (d > snap.data_ref) {
         if (isOut) saidasDesdeRef += valor;
         else entradasDesdeRef += valor;
       }

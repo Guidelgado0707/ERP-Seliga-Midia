@@ -198,7 +198,9 @@ function FormEdit({
             className="w-full border border-line rounded-md px-3 py-2 text-sm" />
         </div>
       </div>
-      <p className="text-[11px] text-muted">O sistema vai calcular o saldo atual a partir desse valor + todo lançamento do extrato desde essa data.</p>
+      <p className="text-[11px] text-muted">
+        O saldo informado é considerado o valor <strong>no fim do dia</strong> da data escolhida. O sistema soma apenas os lançamentos DEPOIS dessa data pra calcular o saldo atual.
+      </p>
       <div className="flex gap-2">
         <button disabled={salvando} type="submit" className="bg-ledger text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-ledger-dark disabled:opacity-60">
           {salvando ? "Salvando…" : "Salvar"}
