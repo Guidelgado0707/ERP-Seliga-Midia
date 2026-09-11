@@ -87,6 +87,8 @@ export async function GET() {
     // pra saldo: soma tudo desde data_ref (inclusive)
     let entradasDesdeRef = 0, saidasDesdeRef = 0;
     let entradasMes = 0, saidasMes = 0;
+    // breakdown por transaction_type do C6 — pro user entender o que compõe o mês
+    const porTipoMes: Record<string, { entrada: number; saida: number; qtd: number }> = {};
     for (const tx of txs) {
       const d = tx.entry_date ?? tx.created_at?.slice(0, 10) ?? "";
       if (!d) continue;
@@ -103,6 +105,10 @@ export async function GET() {
       if (d >= inicioMes) {
         if (isOut) saidasMes += valor;
         else entradasMes += valor;
+        const t = tx.transaction_type ?? "OTHER";
+        const b = (porTipoMes[t] ??= { entrada: 0, saida: 0, qtd: 0 });
+        if (isOut) b.saida += valor; else b.entrada += valor;
+        b.qtd += 1;
       }
     }
 
@@ -117,6 +123,10 @@ export async function GET() {
       saldo_ref: Number(snap.saldo_ref),
       atualizado_em: snap.atualizado_em,
       hoje,
+      // breakdown por tipo pra o card conseguir mostrar detalhe
+      breakdown_mes: Object.entries(porTipoMes)
+        .map(([tipo, v]) => ({ tipo, entrada: Number(v.entrada.toFixed(2)), saida: Number(v.saida.toFixed(2)), qtd: v.qtd }))
+        .sort((a, b) => (b.entrada + b.saida) - (a.entrada + a.saida)),
     });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message ?? String(e) }, { status: 502 });
