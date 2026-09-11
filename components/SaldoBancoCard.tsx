@@ -158,7 +158,10 @@ export default function SaldoBancoCard() {
             </button>
           </div>
           <p className="text-2xl font-bold text-emerald-600 mt-1">{fmtBRL(data.entrou_mes ?? 0)}</p>
-          <p className="text-[11px] text-muted mt-1">Bruto — inclui movimento entre contas próprias e aplicações</p>
+          <p className="text-[11px] text-muted mt-1">
+            Operacional: <strong>{fmtBRL(liquidoMes(data.breakdown_mes, "entrada"))}</strong>{" "}
+            <span className="text-muted">(sem investimentos/estornos)</span>
+          </p>
         </div>
 
         {/* Card 3: Saiu no mês */}
@@ -170,7 +173,10 @@ export default function SaldoBancoCard() {
             </button>
           </div>
           <p className="text-2xl font-bold text-crimson mt-1">{fmtBRL(data.saiu_mes ?? 0)}</p>
-          <p className="text-[11px] text-muted mt-1">Bruto — inclui movimento entre contas próprias e aplicações</p>
+          <p className="text-[11px] text-muted mt-1">
+            Operacional: <strong>{fmtBRL(liquidoMes(data.breakdown_mes, "saida"))}</strong>{" "}
+            <span className="text-muted">(sem investimentos/estornos)</span>
+          </p>
         </div>
       </div>
 
@@ -209,6 +215,21 @@ export default function SaldoBancoCard() {
   );
 }
 
+// Tipos que NÃO são receita/despesa operacional (dinheiro que sai e volta,
+// ou movimento próprio). Excluímos do "operacional" pra dar um número
+// mais próximo do que realmente é receita/despesa da operação.
+const TIPOS_NAO_OPERACIONAIS = new Set([
+  "FUND", "TECH_INVEST", "FIXED_INCOME",  // investimentos (aplicações e resgates)
+  "PAYMENT_REVERSAL",                      // estornos
+  "GLOBAL_ACCOUNT",                        // conta global (transferência interna)
+]);
+function liquidoMes(breakdown: BreakdownItem[] | undefined, tipo: "entrada" | "saida"): number {
+  if (!breakdown) return 0;
+  return breakdown
+    .filter((b) => !TIPOS_NAO_OPERACIONAIS.has(b.tipo))
+    .reduce((acc, b) => acc + b[tipo], 0);
+}
+
 // Rótulos amigáveis pros transaction_types crípticos do C6
 function rotuloTipo(t: string): string {
   const map: Record<string, string> = {
@@ -238,6 +259,9 @@ function rotuloTipo(t: string): string {
     DEBIT_OPEN_BANKING_PIX_REALIZED: "PIX enviado (Open Banking)",
     VEHICLE_TAX: "IPVA",
     TECH_INVEST: "Tech Invest",
+    FIXED_INCOME: "Renda fixa (CDB/aplicação)",
+    DEBIT_CARD: "Cartão de débito",
+    CREDIT_CARD: "Cartão de crédito",
     OTHER: "Outros",
   };
   return map[t] ?? t;
