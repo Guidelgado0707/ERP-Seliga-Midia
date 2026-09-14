@@ -57,6 +57,7 @@ export default function ContratosPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [visualizando, setVisualizando] = useState<Contrato | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [form, setForm] = useState(FORM_VAZIO);
 
   const load = useCallback(async () => {
@@ -70,41 +71,78 @@ export default function ContratosPage() {
     load();
   }, [load]);
 
+  function abrirEdicao(c: Contrato) {
+    setEditandoId(c.id);
+    setForm({
+      contratante_razao_social: c.contratante_razao_social,
+      contratante_cnpj: c.contratante_cnpj,
+      contratante_endereco: c.contratante_endereco,
+      contratante_representante: c.contratante_representante,
+      contratante_email: c.contratante_email,
+      criador: c.criador,
+      quantidade_videos: String(c.quantidade_videos),
+      valor_por_video: String(c.valor_por_video),
+      prazo_tipo: c.prazo_tipo,
+      prazo_quantidade: String(c.prazo_quantidade),
+      data_contrato: c.data_contrato,
+      testemunha1_nome: c.testemunha1_nome,
+      testemunha1_cpf: c.testemunha1_cpf,
+      testemunha2_nome: c.testemunha2_nome ?? "",
+      testemunha2_cpf: c.testemunha2_cpf ?? "",
+    });
+    setShowForm(true);
+    // rola pro topo pra o form ficar visível
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setForm(FORM_VAZIO);
+    setShowForm(false);
+  }
+
   async function handleDelete(id: string, nome: string) {
     if (!window.confirm(`Apagar o contrato de "${nome}"? Essa ação não pode ser desfeita.`)) return;
     setContratos((cs) => cs.filter((c) => c.id !== id));
     await supabase.from("contratos").delete().eq("id", id);
   }
 
-  async function handleAdd(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data } = await supabase
-      .from("contratos")
-      .insert({
-        contratante_razao_social: form.contratante_razao_social,
-        contratante_cnpj: form.contratante_cnpj,
-        contratante_endereco: form.contratante_endereco,
-        contratante_representante: form.contratante_representante,
-        contratante_email: form.contratante_email,
-        criador: form.criador,
-        quantidade_videos: Number(form.quantidade_videos),
-        valor_por_video: Number(form.valor_por_video),
-        prazo_tipo: form.prazo_tipo,
-        prazo_quantidade: Number(form.prazo_quantidade),
-        data_contrato: form.data_contrato,
-        testemunha1_nome: form.testemunha1_nome,
-        testemunha1_cpf: form.testemunha1_cpf,
-        testemunha2_nome: form.testemunha2_nome || null,
-        testemunha2_cpf: form.testemunha2_cpf || null,
-      })
-      .select()
-      .single();
+    const payload = {
+      contratante_razao_social: form.contratante_razao_social,
+      contratante_cnpj: form.contratante_cnpj,
+      contratante_endereco: form.contratante_endereco,
+      contratante_representante: form.contratante_representante,
+      contratante_email: form.contratante_email,
+      criador: form.criador,
+      quantidade_videos: Number(form.quantidade_videos),
+      valor_por_video: Number(form.valor_por_video),
+      prazo_tipo: form.prazo_tipo,
+      prazo_quantidade: Number(form.prazo_quantidade),
+      data_contrato: form.data_contrato,
+      testemunha1_nome: form.testemunha1_nome,
+      testemunha1_cpf: form.testemunha1_cpf,
+      testemunha2_nome: form.testemunha2_nome || null,
+      testemunha2_cpf: form.testemunha2_cpf || null,
+    };
+
+    let data: Contrato | null = null;
+    if (editandoId) {
+      const res = await supabase.from("contratos").update(payload).eq("id", editandoId).select().single();
+      data = (res.data as Contrato | null) ?? null;
+    } else {
+      const res = await supabase.from("contratos").insert(payload).select().single();
+      data = (res.data as Contrato | null) ?? null;
+    }
+
     setForm(FORM_VAZIO);
     setShowForm(false);
+    setEditandoId(null);
     setSaving(false);
     await load();
-    if (data) setVisualizando(data as Contrato);
+    if (data) setVisualizando(data);
   }
 
   if (visualizando) {
@@ -152,7 +190,7 @@ export default function ContratosPage() {
           <p className="text-sm text-muted mt-0.5">Contrato de parceria comercial pronto pra exportar em PDF</p>
         </div>
         <button
-          onClick={() => setShowForm((s) => !s)}
+          onClick={() => (showForm ? cancelarEdicao() : setShowForm(true))}
           className="text-sm font-medium px-3 py-2 rounded-md bg-ledger text-white hover:bg-ledger-dark transition-colors shrink-0"
         >
           {showForm ? "Cancelar" : "+ Novo contrato"}
@@ -160,7 +198,12 @@ export default function ContratosPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleAdd} className="bg-white rounded-md shadow-sm p-5 mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <form onSubmit={handleSubmit} className="bg-white rounded-md shadow-sm p-5 mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          {editandoId && (
+            <p className="text-xs font-medium text-ledger-dark md:col-span-2 -mb-1">
+              Editando contrato existente
+            </p>
+          )}
           <p className="text-sm font-medium text-ink md:col-span-2">Contratante (seu cliente)</p>
           <input
             required
@@ -317,7 +360,7 @@ export default function ContratosPage() {
             type="submit"
             className="md:col-span-2 bg-ledger text-white text-sm font-medium py-2.5 rounded-md hover:bg-ledger-dark transition-colors disabled:opacity-60 mt-2"
           >
-            {saving ? "Salvando..." : "Salvar e gerar contrato"}
+            {saving ? "Salvando..." : editandoId ? "Salvar alterações" : "Salvar e gerar contrato"}
           </button>
         </form>
       )}
@@ -351,6 +394,12 @@ export default function ContratosPage() {
                     className="text-xs font-medium text-ledger-dark hover:underline"
                   >
                     Ver / Baixar PDF
+                  </button>
+                  <button
+                    onClick={() => abrirEdicao(c)}
+                    className="text-xs font-medium text-ledger-dark hover:underline"
+                  >
+                    Editar
                   </button>
                   <button
                     onClick={() => handleDelete(c.id, c.contratante_razao_social)}
