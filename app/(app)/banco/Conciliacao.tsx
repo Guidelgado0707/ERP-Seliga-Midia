@@ -43,6 +43,13 @@ function txDescription(tx: C6Transaction): string {
 function txRef(tx: C6Transaction): string | null {
   return tx.reference ?? tx.local_reference ?? null;
 }
+// Tenta puxar o nome de quem recebeu/mandou da descrição do Pix, pra já vir
+// preenchido no campo Fornecedor/Cliente do avulso (o usuário pode corrigir).
+// Ex: "Pix enviado para João Victor..." -> "João Victor...".
+function nomeSugerido(descricao: string): string {
+  const m = descricao.match(/pix (?:enviado para|recebido de)\s+(.+)/i);
+  return m ? m[1].trim() : "";
+}
 
 // ---------- tipos ----------
 
@@ -86,8 +93,8 @@ export default function Conciliacao() {
   const [categoriasReceber, setCategoriasReceber] = useState<{ id: string; nome: string }[]>([]);
   // qual tx da lista "sem match" tem form aberto + o rascunho dele
   const [avulsoAberto, setAvulsoAberto] = useState<string | null>(null);
-  const [avulsoForm, setAvulsoForm] = useState<{ descricao: string; tipo: "reembolso" | "operacional"; categoria_id: string }>({
-    descricao: "", tipo: "reembolso", categoria_id: "",
+  const [avulsoForm, setAvulsoForm] = useState<{ descricao: string; nome: string; tipo: "reembolso" | "operacional"; categoria_id: string }>({
+    descricao: "", nome: "", tipo: "reembolso", categoria_id: "",
   });
   const [registrandoAvulso, setRegistrandoAvulso] = useState(false);
 
@@ -203,6 +210,7 @@ export default function Conciliacao() {
     const isOut = tx.operation_type === "OUTGOING";
     setAvulsoForm({
       descricao: txDescription(tx) || "",
+      nome: nomeSugerido(txDescription(tx)),
       tipo: isOut ? "operacional" : "reembolso",
       categoria_id: "",
     });
@@ -221,6 +229,7 @@ export default function Conciliacao() {
       const data = txDate(tx) || new Date().toISOString().slice(0, 10);
       const nowIso = new Date().toISOString();
       const descricao = (avulsoForm.descricao || txDescription(tx) || "Lançamento avulso").slice(0, 200);
+      const nome = avulsoForm.nome.trim() || null;
       const categoria_id = avulsoForm.tipo === "operacional" && avulsoForm.categoria_id ? avulsoForm.categoria_id : null;
 
       if (isOut) {
@@ -230,6 +239,7 @@ export default function Conciliacao() {
         // migration e trata aqui.
         const { error } = await supabase.from("contas_pagar").insert({
           descricao,
+          fornecedor: nome,
           valor,
           data_vencimento: data,
           data_pagamento: data,
@@ -243,7 +253,7 @@ export default function Conciliacao() {
       } else {
         const { error } = await supabase.from("contas_receber").insert({
           descricao,
-          cliente: "—",
+          cliente: nome || "—", // not null na tabela — "—" quando não deu pra extrair/preencher
           valor,
           data_vencimento: data,
           data_recebimento: data,
@@ -259,7 +269,7 @@ export default function Conciliacao() {
       // tira da lista de sem match e limpa form
       setSemMatch((prev) => prev.filter((t) => txRef(t) !== ref));
       setAvulsoAberto(null);
-      setAvulsoForm({ descricao: "", tipo: "reembolso", categoria_id: "" });
+      setAvulsoForm({ descricao: "", nome: "", tipo: "reembolso", categoria_id: "" });
     } catch (e) {
       alert(`Erro ao registrar: ${(e as Error).message}`);
     } finally {
@@ -528,13 +538,24 @@ export default function Conciliacao() {
                         )}
                       </div>
                       {abertoAqui && (
-                        <div className="mt-3 pt-3 border-t border-amber-200 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                        <div className="mt-3 pt-3 border-t border-amber-200 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
                           <div className="md:col-span-2">
                             <label className="text-[11px] text-muted block mb-1">Descrição</label>
                             <input
                               value={avulsoForm.descricao}
                               onChange={(e) => setAvulsoForm({ ...avulsoForm, descricao: e.target.value })}
                               placeholder={isOut ? "Ex: pagamento avulso Fulano" : "Ex: reembolso viagem SP - Fulano"}
+                              className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-muted block mb-1">
+                              {isOut ? "Fornecedor" : "Cliente"}
+                            </label>
+                            <input
+                              value={avulsoForm.nome}
+                              onChange={(e) => setAvulsoForm({ ...avulsoForm, nome: e.target.value })}
+                              placeholder={isOut ? "Pra quem foi" : "Quem pagou"}
                               className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
                             />
                           </div>
@@ -559,7 +580,7 @@ export default function Conciliacao() {
                             )}
                           </div>
                           {(isOut || avulsoForm.tipo === "operacional") && (
-                            <div className="md:col-span-3">
+                            <div className="md:col-span-4">
                               <label className="text-[11px] text-muted block mb-1">Categoria (opcional)</label>
                               <select
                                 value={avulsoForm.categoria_id}
@@ -571,7 +592,7 @@ export default function Conciliacao() {
                               </select>
                             </div>
                           )}
-                          <div className="md:col-span-3 flex gap-2">
+                          <div className="md:col-span-4 flex gap-2">
                             <button
                               onClick={() => registrarAvulso(tx)}
                               disabled={registrandoAvulso}
