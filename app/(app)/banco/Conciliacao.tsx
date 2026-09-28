@@ -50,6 +50,12 @@ function nomeSugerido(descricao: string): string {
   const m = descricao.match(/pix (?:enviado para|recebido de)\s+(.+)/i);
   return m ? m[1].trim() : "";
 }
+// Lançamento pro João = Projeto JC (acordado com o Guilherme, 2026-09-29) —
+// pré-seleciona a operação certa pra não cair na Seliga Mídia por engano.
+// Continua editável no select; isso é só o palpite inicial.
+function origemSugerida(nome: string): "seliga_midia" | "projeto_jc" {
+  return /jo[aã]o/i.test(nome) ? "projeto_jc" : "seliga_midia";
+}
 
 // ---------- tipos ----------
 
@@ -93,8 +99,14 @@ export default function Conciliacao() {
   const [categoriasReceber, setCategoriasReceber] = useState<{ id: string; nome: string }[]>([]);
   // qual tx da lista "sem match" tem form aberto + o rascunho dele
   const [avulsoAberto, setAvulsoAberto] = useState<string | null>(null);
-  const [avulsoForm, setAvulsoForm] = useState<{ descricao: string; nome: string; tipo: "reembolso" | "operacional"; categoria_id: string }>({
-    descricao: "", nome: "", tipo: "reembolso", categoria_id: "",
+  const [avulsoForm, setAvulsoForm] = useState<{
+    descricao: string;
+    nome: string;
+    tipo: "reembolso" | "operacional";
+    categoria_id: string;
+    origem: "seliga_midia" | "projeto_jc";
+  }>({
+    descricao: "", nome: "", tipo: "reembolso", categoria_id: "", origem: "seliga_midia",
   });
   const [registrandoAvulso, setRegistrandoAvulso] = useState(false);
 
@@ -208,11 +220,13 @@ export default function Conciliacao() {
     // saídas: default operacional (não tem "reembolso" pra pagar).
     // entradas: default reembolso (caso mais comum de tx sem match).
     const isOut = tx.operation_type === "OUTGOING";
+    const nome = nomeSugerido(txDescription(tx));
     setAvulsoForm({
       descricao: txDescription(tx) || "",
-      nome: nomeSugerido(txDescription(tx)),
+      nome,
       tipo: isOut ? "operacional" : "reembolso",
       categoria_id: "",
+      origem: origemSugerida(nome),
     });
   }
 
@@ -245,7 +259,7 @@ export default function Conciliacao() {
           data_pagamento: data,
           pago_em: nowIso,
           status: "pago",
-          origem: "seliga_midia",
+          origem: avulsoForm.origem,
           categoria_id,
           banco_referencia: ref,
         });
@@ -259,7 +273,7 @@ export default function Conciliacao() {
           data_recebimento: data,
           recebido_em: nowIso,
           status: "recebido",
-          origem: "seliga_midia",
+          origem: avulsoForm.origem,
           categoria_id,
           banco_referencia: ref,
           reembolso: avulsoForm.tipo === "reembolso",
@@ -269,7 +283,7 @@ export default function Conciliacao() {
       // tira da lista de sem match e limpa form
       setSemMatch((prev) => prev.filter((t) => txRef(t) !== ref));
       setAvulsoAberto(null);
-      setAvulsoForm({ descricao: "", nome: "", tipo: "reembolso", categoria_id: "" });
+      setAvulsoForm({ descricao: "", nome: "", tipo: "reembolso", categoria_id: "", origem: "seliga_midia" });
     } catch (e) {
       alert(`Erro ao registrar: ${(e as Error).message}`);
     } finally {
@@ -538,7 +552,7 @@ export default function Conciliacao() {
                         )}
                       </div>
                       {abertoAqui && (
-                        <div className="mt-3 pt-3 border-t border-amber-200 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
+                        <div className="mt-3 pt-3 border-t border-amber-200 grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
                           <div className="md:col-span-2">
                             <label className="text-[11px] text-muted block mb-1">Descrição</label>
                             <input
@@ -558,6 +572,17 @@ export default function Conciliacao() {
                               placeholder={isOut ? "Pra quem foi" : "Quem pagou"}
                               className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
                             />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-muted block mb-1">Operação</label>
+                            <select
+                              value={avulsoForm.origem}
+                              onChange={(e) => setAvulsoForm({ ...avulsoForm, origem: e.target.value as "seliga_midia" | "projeto_jc" })}
+                              className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
+                            >
+                              <option value="seliga_midia">Seliga Mídia</option>
+                              <option value="projeto_jc">Projeto JC</option>
+                            </select>
                           </div>
                           <div>
                             <label className="text-[11px] text-muted block mb-1">Tipo</label>
@@ -580,7 +605,7 @@ export default function Conciliacao() {
                             )}
                           </div>
                           {(isOut || avulsoForm.tipo === "operacional") && (
-                            <div className="md:col-span-4">
+                            <div className="md:col-span-5">
                               <label className="text-[11px] text-muted block mb-1">Categoria (opcional)</label>
                               <select
                                 value={avulsoForm.categoria_id}
@@ -592,7 +617,7 @@ export default function Conciliacao() {
                               </select>
                             </div>
                           )}
-                          <div className="md:col-span-4 flex gap-2">
+                          <div className="md:col-span-5 flex gap-2">
                             <button
                               onClick={() => registrarAvulso(tx)}
                               disabled={registrandoAvulso}
