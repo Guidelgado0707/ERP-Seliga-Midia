@@ -105,8 +105,9 @@ export default function Conciliacao() {
     tipo: "reembolso" | "operacional";
     categoria_id: string;
     origem: "seliga_midia" | "projeto_jc";
+    data: string;
   }>({
-    descricao: "", nome: "", tipo: "reembolso", categoria_id: "", origem: "seliga_midia",
+    descricao: "", nome: "", tipo: "reembolso", categoria_id: "", origem: "seliga_midia", data: "",
   });
   const [registrandoAvulso, setRegistrandoAvulso] = useState(false);
 
@@ -227,6 +228,7 @@ export default function Conciliacao() {
       tipo: isOut ? "operacional" : "reembolso",
       categoria_id: "",
       origem: origemSugerida(nome),
+      data: txDate(tx) || new Date().toISOString().slice(0, 10),
     });
   }
 
@@ -240,7 +242,10 @@ export default function Conciliacao() {
     try {
       const isOut = tx.operation_type === "OUTGOING";
       const valor = txAmount(tx);
-      const data = txDate(tx) || new Date().toISOString().slice(0, 10);
+      // Data de competência (vai pra data_vencimento/data_pagamento, o que a DRE
+      // e o Painel usam pra decidir o mês) — editável no form, pode ser diferente
+      // do dia real da transação (ex: pago em 28/09 mas competência é outubro).
+      const data = avulsoForm.data || txDate(tx) || new Date().toISOString().slice(0, 10);
       const nowIso = new Date().toISOString();
       const descricao = (avulsoForm.descricao || txDescription(tx) || "Lançamento avulso").slice(0, 200);
       const nome = avulsoForm.nome.trim() || null;
@@ -283,7 +288,7 @@ export default function Conciliacao() {
       // tira da lista de sem match e limpa form
       setSemMatch((prev) => prev.filter((t) => txRef(t) !== ref));
       setAvulsoAberto(null);
-      setAvulsoForm({ descricao: "", nome: "", tipo: "reembolso", categoria_id: "", origem: "seliga_midia" });
+      setAvulsoForm({ descricao: "", nome: "", tipo: "reembolso", categoria_id: "", origem: "seliga_midia", data: "" });
     } catch (e) {
       alert(`Erro ao registrar: ${(e as Error).message}`);
     } finally {
@@ -552,60 +557,80 @@ export default function Conciliacao() {
                         )}
                       </div>
                       {abertoAqui && (
-                        <div className="mt-3 pt-3 border-t border-amber-200 grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
-                          <div className="md:col-span-2">
-                            <label className="text-[11px] text-muted block mb-1">Descrição</label>
-                            <input
-                              value={avulsoForm.descricao}
-                              onChange={(e) => setAvulsoForm({ ...avulsoForm, descricao: e.target.value })}
-                              placeholder={isOut ? "Ex: pagamento avulso Fulano" : "Ex: reembolso viagem SP - Fulano"}
-                              className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] text-muted block mb-1">
-                              {isOut ? "Fornecedor" : "Cliente"}
-                            </label>
-                            <input
-                              value={avulsoForm.nome}
-                              onChange={(e) => setAvulsoForm({ ...avulsoForm, nome: e.target.value })}
-                              placeholder={isOut ? "Pra quem foi" : "Quem pagou"}
-                              className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] text-muted block mb-1">Operação</label>
-                            <select
-                              value={avulsoForm.origem}
-                              onChange={(e) => setAvulsoForm({ ...avulsoForm, origem: e.target.value as "seliga_midia" | "projeto_jc" })}
-                              className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
-                            >
-                              <option value="seliga_midia">Seliga Mídia</option>
-                              <option value="projeto_jc">Projeto JC</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[11px] text-muted block mb-1">Tipo</label>
-                            {isOut ? (
+                        <div className="mt-3 pt-3 border-t border-amber-200 space-y-2">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                            <div className="md:col-span-2">
+                              <label className="text-[11px] text-muted block mb-1">Descrição</label>
                               <input
-                                readOnly
-                                value="Operacional (entra na DRE)"
-                                title="Saídas só entram como operacional — flag 'reembolso' é só de entradas."
-                                className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-gray-50 text-muted"
+                                value={avulsoForm.descricao}
+                                onChange={(e) => setAvulsoForm({ ...avulsoForm, descricao: e.target.value })}
+                                placeholder={isOut ? "Ex: pagamento avulso Fulano" : "Ex: reembolso viagem SP - Fulano"}
+                                className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
                               />
-                            ) : (
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-muted block mb-1">
+                                {isOut ? "Fornecedor" : "Cliente"}
+                              </label>
+                              <input
+                                value={avulsoForm.nome}
+                                onChange={(e) => setAvulsoForm({ ...avulsoForm, nome: e.target.value })}
+                                placeholder={isOut ? "Pra quem foi" : "Quem pagou"}
+                                className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                            <div>
+                              <label className="text-[11px] text-muted block mb-1">
+                                Data ({isOut ? "vencimento/pagamento" : "vencimento/recebimento"})
+                              </label>
+                              <input
+                                type="date"
+                                value={avulsoForm.data}
+                                onChange={(e) => setAvulsoForm({ ...avulsoForm, data: e.target.value })}
+                                className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
+                              />
+                              {avulsoForm.data && avulsoForm.data !== txDate(tx) && (
+                                <p className="text-[11px] text-amber-700 mt-1">
+                                  ⚠ diferente do dia da transação ({fmtDate(txDate(tx))}) — é a data que vale pra DRE/Painel.
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-muted block mb-1">Operação</label>
                               <select
-                                value={avulsoForm.tipo}
-                                onChange={(e) => setAvulsoForm({ ...avulsoForm, tipo: e.target.value as "reembolso" | "operacional", categoria_id: "" })}
+                                value={avulsoForm.origem}
+                                onChange={(e) => setAvulsoForm({ ...avulsoForm, origem: e.target.value as "seliga_midia" | "projeto_jc" })}
                                 className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
                               >
-                                <option value="reembolso">Reembolso (não afeta DRE)</option>
-                                <option value="operacional">Operacional (entra na DRE)</option>
+                                <option value="seliga_midia">Seliga Mídia</option>
+                                <option value="projeto_jc">Projeto JC</option>
                               </select>
-                            )}
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-muted block mb-1">Tipo</label>
+                              {isOut ? (
+                                <input
+                                  readOnly
+                                  value="Operacional (entra na DRE)"
+                                  title="Saídas só entram como operacional — flag 'reembolso' é só de entradas."
+                                  className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-gray-50 text-muted"
+                                />
+                              ) : (
+                                <select
+                                  value={avulsoForm.tipo}
+                                  onChange={(e) => setAvulsoForm({ ...avulsoForm, tipo: e.target.value as "reembolso" | "operacional", categoria_id: "" })}
+                                  className="w-full border border-line rounded-md px-2.5 py-1.5 text-sm bg-white"
+                                >
+                                  <option value="reembolso">Reembolso (não afeta DRE)</option>
+                                  <option value="operacional">Operacional (entra na DRE)</option>
+                                </select>
+                              )}
+                            </div>
                           </div>
                           {(isOut || avulsoForm.tipo === "operacional") && (
-                            <div className="md:col-span-5">
+                            <div>
                               <label className="text-[11px] text-muted block mb-1">Categoria (opcional)</label>
                               <select
                                 value={avulsoForm.categoria_id}
@@ -617,7 +642,7 @@ export default function Conciliacao() {
                               </select>
                             </div>
                           )}
-                          <div className="md:col-span-5 flex gap-2">
+                          <div className="flex gap-2">
                             <button
                               onClick={() => registrarAvulso(tx)}
                               disabled={registrandoAvulso}
