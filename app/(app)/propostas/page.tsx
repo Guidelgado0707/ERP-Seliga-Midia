@@ -2,21 +2,46 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabaseClient";
-import PropostaDocumento, { CRIADORES } from "@/components/PropostaDocumento";
+import PropostaDocumento, { CRIADORES, type PropostaOpcao } from "@/components/PropostaDocumento";
 
 type Proposta = {
   id: string;
   empresa: string;
   criador: string;
   meses: number;
-  quantidade_videos: number;
-  valor_unitario: number;
+  opcoes: PropostaOpcao[] | null;
+  // legado: propostas criadas antes das opções múltiplas
+  quantidade_videos: number | null;
+  valor_unitario: number | null;
   resumo: string | null;
   created_at: string;
 };
 
 function formatBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+// opções sugeridas pra começar o formulário — o usuário apaga as que não usar
+// e pode adicionar quantas quiser
+const OPCOES_PADRAO = [
+  { titulo: "Avulso (por vídeo)", valor: "", detalhe: "" },
+  { titulo: "Pacote fechado", valor: "", detalhe: "" },
+  { titulo: "Mensal — 3 meses", valor: "", detalhe: "" },
+];
+
+// opções efetivas de uma proposta já salva, com fallback pro formato antigo
+function opcoesDe(p: Proposta): PropostaOpcao[] {
+  if (p.opcoes && p.opcoes.length > 0) return p.opcoes;
+  if (p.quantidade_videos && p.valor_unitario) {
+    return [
+      {
+        titulo: "Pacote completo",
+        valor: p.quantidade_videos * Number(p.valor_unitario),
+        detalhe: `${formatBRL(Number(p.valor_unitario))} por vídeo · ${p.quantidade_videos} vídeos`,
+      },
+    ];
+  }
+  return [];
 }
 
 export default function PropostasPage() {
@@ -31,10 +56,19 @@ export default function PropostasPage() {
     empresa: "",
     criador: CRIADORES[0] as string,
     meses: "3",
-    quantidade_videos: "",
-    valor_unitario: "",
     resumo: "",
   });
+  const [opcoes, setOpcoes] = useState(OPCOES_PADRAO.map((o) => ({ ...o })));
+
+  function updateOpcao(i: number, field: "titulo" | "valor" | "detalhe", value: string) {
+    setOpcoes((os) => os.map((o, idx) => (idx === i ? { ...o, [field]: value } : o)));
+  }
+  function addOpcao() {
+    setOpcoes((os) => [...os, { titulo: "", valor: "", detalhe: "" }]);
+  }
+  function removeOpcao(i: number) {
+    setOpcoes((os) => os.filter((_, idx) => idx !== i));
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,6 +89,13 @@ export default function PropostasPage() {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
+    const opcoesValidas: PropostaOpcao[] = opcoes
+      .filter((o) => o.titulo.trim() && o.valor.trim())
+      .map((o) => ({ titulo: o.titulo.trim(), valor: Number(o.valor), detalhe: o.detalhe.trim() || null }));
+    if (opcoesValidas.length === 0) {
+      window.alert("Preencha pelo menos uma opção de preço (título + valor).");
+      return;
+    }
     setSaving(true);
     const { data } = await supabase
       .from("propostas")
@@ -62,13 +103,13 @@ export default function PropostasPage() {
         empresa: form.empresa,
         criador: form.criador,
         meses: Number(form.meses),
-        quantidade_videos: Number(form.quantidade_videos),
-        valor_unitario: Number(form.valor_unitario),
+        opcoes: opcoesValidas,
         resumo: form.resumo || null,
       })
       .select()
       .single();
-    setForm({ empresa: "", criador: CRIADORES[0], meses: "3", quantidade_videos: "", valor_unitario: "", resumo: "" });
+    setForm({ empresa: "", criador: CRIADORES[0], meses: "3", resumo: "" });
+    setOpcoes(OPCOES_PADRAO.map((o) => ({ ...o })));
     setShowForm(false);
     setSaving(false);
     await load();
@@ -97,8 +138,7 @@ export default function PropostasPage() {
             empresa={visualizando.empresa}
             criador={visualizando.criador}
             meses={visualizando.meses}
-            quantidade_videos={visualizando.quantidade_videos}
-            valor_unitario={Number(visualizando.valor_unitario)}
+            opcoes={opcoesDe(visualizando)}
             resumo={visualizando.resumo}
           />
         </div>
@@ -145,29 +185,60 @@ export default function PropostasPage() {
             required
             type="number"
             min="1"
-            placeholder="Quantidade de meses"
+            placeholder="Quantidade de meses (pra frase de abertura)"
             value={form.meses}
             onChange={(e) => setForm({ ...form, meses: e.target.value })}
-            className="px-3 py-2.5 rounded-md border border-line text-sm font-mono"
-          />
-          <input
-            required
-            type="number"
-            min="1"
-            placeholder="Quantidade de vídeos (total)"
-            value={form.quantidade_videos}
-            onChange={(e) => setForm({ ...form, quantidade_videos: e.target.value })}
-            className="px-3 py-2.5 rounded-md border border-line text-sm font-mono"
-          />
-          <input
-            required
-            type="number"
-            step="0.01"
-            placeholder="Valor unitário por vídeo (R$)"
-            value={form.valor_unitario}
-            onChange={(e) => setForm({ ...form, valor_unitario: e.target.value })}
             className="px-3 py-2.5 rounded-md border border-line text-sm font-mono md:col-span-2"
           />
+
+          <div className="md:col-span-2">
+            <p className="text-xs font-medium text-muted mb-2">
+              Opções de preço — preencha as que quiser oferecer (deixe título e valor em branco pra não incluir)
+            </p>
+            <div className="space-y-2">
+              {opcoes.map((o, i) => (
+                <div key={i} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                  <input
+                    placeholder="Título (ex: Avulso, Pacote, Mensal)"
+                    value={o.titulo}
+                    onChange={(e) => updateOpcao(i, "titulo", e.target.value)}
+                    className="px-3 py-2 rounded-md border border-line text-sm flex-1"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Valor (R$)"
+                    value={o.valor}
+                    onChange={(e) => updateOpcao(i, "valor", e.target.value)}
+                    className="px-3 py-2 rounded-md border border-line text-sm font-mono sm:w-32"
+                  />
+                  <input
+                    placeholder="Detalhe (opcional)"
+                    value={o.detalhe}
+                    onChange={(e) => updateOpcao(i, "detalhe", e.target.value)}
+                    className="px-3 py-2 rounded-md border border-line text-sm flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeOpcao(i)}
+                    title="Remover opção"
+                    aria-label="Remover opção"
+                    className="text-muted hover:text-crimson transition-colors px-2 self-center"
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addOpcao}
+              className="text-xs font-medium text-ledger-dark hover:underline mt-2"
+            >
+              + Adicionar opção
+            </button>
+          </div>
+
           <textarea
             placeholder="Resumo dos vídeos que podemos fazer (opcional — se deixar em branco, usa as frentes de conteúdo padrão)"
             value={form.resumo}
@@ -175,12 +246,6 @@ export default function PropostasPage() {
             rows={3}
             className="px-3 py-2.5 rounded-md border border-line text-sm md:col-span-2"
           />
-          {form.empresa && form.quantidade_videos && form.valor_unitario && (
-            <p className="text-xs text-muted md:col-span-2">
-              Total: {formatBRL(Number(form.quantidade_videos) * Number(form.valor_unitario))}
-              {form.meses && ` · ${Math.round(Number(form.quantidade_videos) / Number(form.meses))} vídeos/mês`}
-            </p>
-          )}
           <button
             disabled={saving}
             type="submit"
@@ -197,19 +262,26 @@ export default function PropostasPage() {
           <p className="px-5 py-6 text-sm text-muted">Nenhuma proposta criada ainda.</p>
         )}
         <div className="divide-y divide-line">
-          {propostas.map((p) => (
+          {propostas.map((p) => {
+            const opts = opcoesDe(p);
+            const valores = opts.map((o) => o.valor);
+            const min = valores.length ? Math.min(...valores) : null;
+            const max = valores.length ? Math.max(...valores) : null;
+            return (
             <div key={p.id} className="px-5 py-3.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink truncate">{p.empresa}</p>
-                <p className="text-xs text-muted">
-                  {p.criador} · {p.quantidade_videos} vídeos em {p.meses} {p.meses === 1 ? "mês" : "meses"} ·{" "}
-                  {formatBRL(Number(p.valor_unitario))}/vídeo · {new Date(p.created_at).toLocaleDateString("pt-BR")}
+                <p className="text-xs text-muted truncate">
+                  {p.criador} · {opts.length === 0 ? "sem opções" : opts.map((o) => o.titulo).join(" · ")} ·{" "}
+                  {new Date(p.created_at).toLocaleDateString("pt-BR")}
                 </p>
               </div>
               <div className="flex items-center gap-3 flex-wrap sm:shrink-0">
-                <span className="font-mono tabular text-sm text-ink">
-                  {formatBRL(p.quantidade_videos * Number(p.valor_unitario))}
-                </span>
+                {min !== null && (
+                  <span className="font-mono tabular text-sm text-ink">
+                    {max !== null && max !== min ? `${formatBRL(min)} – ${formatBRL(max)}` : formatBRL(min)}
+                  </span>
+                )}
                 <button
                   onClick={() => setVisualizando(p)}
                   className="text-xs font-medium text-ledger-dark hover:underline"
@@ -226,7 +298,8 @@ export default function PropostasPage() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

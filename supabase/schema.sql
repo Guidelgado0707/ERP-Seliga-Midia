@@ -161,8 +161,11 @@ create table propostas (
   criador text not null default 'Girando na Alta'
     check (criador in ('Girando na Alta', 'Lucas Feitoza', 'Seliga Mídia')),
   meses integer not null default 3,
-  quantidade_videos integer not null,
-  valor_unitario numeric(12,2) not null,
+  -- legado: proposta antiga usa esses dois (um único preço). Proposta nova
+  -- usa "opcoes" (várias opções de preço, ex: avulso / pacote / mensal).
+  quantidade_videos integer,
+  valor_unitario numeric(12,2),
+  opcoes jsonb not null default '[]'::jsonb,
   resumo text,
   created_at timestamptz not null default now(),
   created_by uuid references auth.users(id) default auth.uid()

@@ -47,12 +47,20 @@ function formatBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+export type PropostaOpcao = {
+  titulo: string;
+  valor: number;
+  detalhe?: string | null;
+};
+
 export type PropostaDados = {
   empresa: string;
   criador?: Criador | string | null;
   meses: number;
-  quantidade_videos: number;
-  valor_unitario: number;
+  opcoes?: PropostaOpcao[] | null;
+  // legado: propostas antigas (antes das opções múltiplas) só tinham isso
+  quantidade_videos?: number | null;
+  valor_unitario?: number | null;
   resumo?: string | null;
 };
 
@@ -60,12 +68,24 @@ export default function PropostaDocumento({
   empresa,
   criador,
   meses,
+  opcoes,
   quantidade_videos,
   valor_unitario,
   resumo,
 }: PropostaDados) {
-  const total = quantidade_videos * valor_unitario;
-  const videosPorMes = Math.round(quantidade_videos / meses);
+  // fallback pra proposta antiga, criada antes de existir a lista de opções
+  const opcoesEfetivas: PropostaOpcao[] =
+    opcoes && opcoes.length > 0
+      ? opcoes
+      : quantidade_videos && valor_unitario
+      ? [
+          {
+            titulo: "Pacote completo",
+            valor: quantidade_videos * valor_unitario,
+            detalhe: `${formatBRL(valor_unitario)} por vídeo · ${quantidade_videos} vídeos`,
+          },
+        ]
+      : [];
   const ano = new Date().getFullYear();
   const nomeEmpresa = empresa || "Sua Empresa";
   const nomeCriador: Criador = (criador as Criador) && GRAMATICA[criador as Criador] ? (criador as Criador) : "Girando na Alta";
@@ -108,9 +128,9 @@ export default function PropostaDocumento({
         </div>
       </div>
 
-      {/* Corpo branco: parceria / objetivo / frentes  +  card de pacote */}
-      <div className="px-8 py-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
+      {/* Corpo branco: parceria / objetivo / frentes */}
+      <div className="px-8 py-6">
+        <div className="mb-6">
           <p className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: ORANGE }}>
             A Parceria
           </p>
@@ -145,43 +165,33 @@ export default function PropostaDocumento({
           )}
         </div>
 
-        <div className="bg-neutral-100 rounded-lg p-5">
-          <span
-            className="inline-block text-[10px] font-bold tracking-wide uppercase text-white px-3 py-1.5 rounded-full mb-3"
-            style={{ backgroundColor: ORANGE }}
-          >
-            Pacote completo
-          </span>
-          <p className="text-3xl font-extrabold text-neutral-900 mb-1">{formatBRL(total)}</p>
-          <p className="text-xs text-neutral-500 mb-4">
-            investimento total &nbsp;|&nbsp; {formatBRL(valor_unitario)} por vídeo
-          </p>
-          <div className="border-t border-neutral-300 pt-3 grid grid-cols-3 gap-2 mb-4">
-            <div>
-              <p className="text-xl font-extrabold" style={{ color: ORANGE }}>
-                {String(meses).padStart(2, "0")}
-              </p>
-              <p className="text-[9px] font-bold uppercase text-neutral-500 tracking-wide">Meses</p>
-            </div>
-            <div>
-              <p className="text-xl font-extrabold" style={{ color: ORANGE }}>
-                {String(quantidade_videos).padStart(2, "0")}
-              </p>
-              <p className="text-[9px] font-bold uppercase text-neutral-500 tracking-wide">Vídeos</p>
-            </div>
-            <div>
-              <p className="text-xl font-extrabold" style={{ color: ORANGE }}>
-                {String(videosPorMes).padStart(2, "0")}
-              </p>
-              <p className="text-[9px] font-bold uppercase text-neutral-500 tracking-wide">Vídeos / mês</p>
-            </div>
-          </div>
-          <div style={{ backgroundColor: NAVY }} className="rounded-md py-2.5 px-3 text-center">
-            <p className="text-white text-[10px] font-bold tracking-wide uppercase leading-snug">
-              Planejamento, produção e entrega inclusos
+        {/* Opções de investimento: cartões lado a lado (avulso / pacote / mensal / etc.) */}
+        {opcoesEfetivas.length > 0 && (
+          <div>
+            <p className="text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: ORANGE }}>
+              {opcoesEfetivas.length > 1 ? "Opções de investimento" : "Investimento"}
             </p>
+            <div className="flex flex-wrap gap-3">
+              {opcoesEfetivas.map((o, i) => (
+                <div key={i} className="bg-neutral-100 rounded-lg p-4 flex-1 min-w-[160px]">
+                  <span
+                    className="inline-block text-[9px] font-bold tracking-wide uppercase text-white px-2.5 py-1 rounded-full mb-2.5"
+                    style={{ backgroundColor: ORANGE }}
+                  >
+                    {o.titulo}
+                  </span>
+                  <p className="text-2xl font-extrabold text-neutral-900 leading-tight">{formatBRL(o.valor)}</p>
+                  {o.detalhe && <p className="text-xs text-neutral-500 mt-1">{o.detalhe}</p>}
+                </div>
+              ))}
+            </div>
+            <div style={{ backgroundColor: NAVY }} className="rounded-md py-2.5 px-3 text-center mt-3">
+              <p className="text-white text-[10px] font-bold tracking-wide uppercase leading-snug">
+                Planejamento, produção e entrega inclusos
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Audiência */}
