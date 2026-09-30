@@ -51,6 +51,7 @@ export default function PropostasPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [visualizando, setVisualizando] = useState<Proposta | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     empresa: "",
@@ -87,7 +88,30 @@ export default function PropostasPage() {
     await supabase.from("propostas").delete().eq("id", id);
   }
 
-  async function handleAdd(e: React.FormEvent) {
+  function resetForm() {
+    setForm({ empresa: "", criador: CRIADORES[0], meses: "3", resumo: "" });
+    setOpcoes(OPCOES_PADRAO.map((o) => ({ ...o })));
+    setEditingId(null);
+  }
+
+  function startEdit(p: Proposta) {
+    setEditingId(p.id);
+    setForm({
+      empresa: p.empresa,
+      criador: p.criador,
+      meses: String(p.meses),
+      resumo: p.resumo ?? "",
+    });
+    const opts = opcoesDe(p);
+    setOpcoes(
+      opts.length > 0
+        ? opts.map((o) => ({ titulo: o.titulo, valor: String(o.valor), detalhe: o.detalhe ?? "" }))
+        : OPCOES_PADRAO.map((o) => ({ ...o }))
+    );
+    setShowForm(true);
+  }
+
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const opcoesValidas: PropostaOpcao[] = opcoes
       .filter((o) => o.titulo.trim() && o.valor.trim())
@@ -97,19 +121,17 @@ export default function PropostasPage() {
       return;
     }
     setSaving(true);
-    const { data } = await supabase
-      .from("propostas")
-      .insert({
-        empresa: form.empresa,
-        criador: form.criador,
-        meses: Number(form.meses),
-        opcoes: opcoesValidas,
-        resumo: form.resumo || null,
-      })
-      .select()
-      .single();
-    setForm({ empresa: "", criador: CRIADORES[0], meses: "3", resumo: "" });
-    setOpcoes(OPCOES_PADRAO.map((o) => ({ ...o })));
+    const payload = {
+      empresa: form.empresa,
+      criador: form.criador,
+      meses: Number(form.meses),
+      opcoes: opcoesValidas,
+      resumo: form.resumo || null,
+    };
+    const { data } = editingId
+      ? await supabase.from("propostas").update(payload).eq("id", editingId).select().single()
+      : await supabase.from("propostas").insert(payload).select().single();
+    resetForm();
     setShowForm(false);
     setSaving(false);
     await load();
@@ -154,7 +176,15 @@ export default function PropostasPage() {
           <p className="text-sm text-muted mt-0.5">Proposta comercial pronta pra exportar em PDF</p>
         </div>
         <button
-          onClick={() => setShowForm((s) => !s)}
+          onClick={() => {
+            if (showForm) {
+              resetForm();
+              setShowForm(false);
+            } else {
+              resetForm();
+              setShowForm(true);
+            }
+          }}
           className="text-sm font-medium px-3 py-2 rounded-md bg-ledger text-white hover:bg-ledger-dark transition-colors shrink-0"
         >
           {showForm ? "Cancelar" : "+ Nova proposta"}
@@ -162,7 +192,10 @@ export default function PropostasPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleAdd} className="bg-white rounded-md shadow-sm p-5 mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <form onSubmit={handleSave} className="bg-white rounded-md shadow-sm p-5 mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          {editingId && (
+            <p className="text-xs font-medium text-ledger-dark md:col-span-2 -mb-1">Editando proposta existente</p>
+          )}
           <input
             required
             placeholder="Nome da empresa"
@@ -251,7 +284,7 @@ export default function PropostasPage() {
             type="submit"
             className="md:col-span-2 bg-ledger text-white text-sm font-medium py-2.5 rounded-md hover:bg-ledger-dark transition-colors disabled:opacity-60"
           >
-            {saving ? "Salvando..." : "Salvar e gerar proposta"}
+            {saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar e gerar proposta"}
           </button>
         </form>
       )}
@@ -287,6 +320,12 @@ export default function PropostasPage() {
                   className="text-xs font-medium text-ledger-dark hover:underline"
                 >
                   Ver / Baixar PDF
+                </button>
+                <button
+                  onClick={() => startEdit(p)}
+                  className="text-xs font-medium text-ledger-dark hover:underline"
+                >
+                  Editar
                 </button>
                 <button
                   onClick={() => handleDelete(p.id, p.empresa)}
