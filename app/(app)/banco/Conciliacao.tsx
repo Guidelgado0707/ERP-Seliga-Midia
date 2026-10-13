@@ -86,6 +86,9 @@ export default function Conciliacao() {
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [semMatch, setSemMatch] = useState<C6Transaction[]>([]);
   const [jaConciliadosCount, setJaConciliadosCount] = useState(0);
+  // lançamentos marcados como "Ignorar" (tabela banco_ignorados) — ficam fora da conciliação
+  const [ignoradosTx, setIgnoradosTx] = useState<C6Transaction[]>([]);
+  const [verIgnorados, setVerIgnorados] = useState(false);
   const [escolha, setEscolha] = useState<Record<string, string>>({}); // txRef -> contaId
   const [confirmando, setConfirmando] = useState<string | null>(null);
   // guarda TODAS as contas em aberto pra o usuário poder escolher qualquer uma,
@@ -128,18 +131,24 @@ export default function Conciliacao() {
       const transactions: C6Transaction[] = data.transactions ?? [];
 
       // referências já conciliadas anteriormente (não sugerir de novo)
-      const [pagarRefsRes, receberRefsRes] = await Promise.all([
+      const [pagarRefsRes, receberRefsRes, ignoradosRes] = await Promise.all([
         supabase.from("contas_pagar").select("banco_referencia").not("banco_referencia", "is", null),
         supabase.from("contas_receber").select("banco_referencia").not("banco_referencia", "is", null),
+        supabase.from("banco_ignorados").select("banco_referencia"),
       ]);
       const jaConciliados = new Set<string>([
         ...(pagarRefsRes.data ?? []).map((r) => r.banco_referencia as string),
         ...(receberRefsRes.data ?? []).map((r) => r.banco_referencia as string),
       ]);
+      // se a tabela ainda não existir (migração não rodada), ignoradosRes.data vem vazio e a tela segue normal
+      const refsIgnorados = new Set<string>((ignoradosRes.data ?? []).map((r) => r.banco_referencia as string));
 
       const comRef = transactions.filter((tx) => txRef(tx) !== null);
-      const pendentes = comRef.filter((tx) => !jaConciliados.has(txRef(tx)!));
-      setJaConciliadosCount(comRef.length - pendentes.length);
+      const conciliados = comRef.filter((tx) => jaConciliados.has(txRef(tx)!));
+      const ignorados = comRef.filter((tx) => !jaConciliados.has(txRef(tx)!) && refsIgnorados.has(txRef(tx)!));
+      const pendentes = comRef.filter((tx) => !jaConciliados.has(txRef(tx)!) && !refsIgnorados.has(txRef(tx)!));
+      setJaConciliadosCount(conciliados.length);
+      setIgnoradosTx(ignorados);
 
       // contas em aberto candidatas (ainda não conciliadas)
       const [pagarRes, receberRes] = await Promise.all([
@@ -212,6 +221,42 @@ export default function Conciliacao() {
     const ref = txRef(tx);
     setSugestoes((prev) => prev.filter((s) => txRef(s.tx) !== ref));
     setSemMatch((prev) => [...prev, tx]);
+  }
+
+  // "Ignorar": o lançamento some da conciliação e não vira conta a pagar/receber.
+  // Persiste em banco_ignorados (por referência do extrato) pra não voltar na próxima busca.
+  async function ignorarTx(tx: C6Transaction) {
+    const ref = txRef(tx);
+    if (!ref) return;
+    const ok = window.confirm(
+      `Ignorar "${txDescription(tx)}" (${fmtBRL(txAmount(tx))})?\n\nEle deixa de aparecer na conciliação e não vira conta a pagar/receber. Dá pra restaurar depois.`,
+    );
+    if (!ok) return;
+    const { error: insErr } = await supabase.from("banco_ignorados").insert({
+      banco_referencia: ref,
+      descricao: txDescription(tx),
+      valor: txAmount(tx),
+      data: txDate(tx) || null,
+    });
+    if (insErr) {
+      alert(`Erro ao ignorar: ${insErr.message}`);
+      return;
+    }
+    setSemMatch((prev) => prev.filter((t) => txRef(t) !== ref));
+    setIgnoradosTx((prev) => [...prev, tx]);
+    if (avulsoAberto === ref) setAvulsoAberto(null);
+  }
+
+  // desfaz o "Ignorar" e refaz a busca, pra tx voltar a ser casada/listada normalmente
+  async function restaurarTx(tx: C6Transaction) {
+    const ref = txRef(tx);
+    if (!ref) return;
+    const { error: delErr } = await supabase.from("banco_ignorados").delete().eq("banco_referencia", ref);
+    if (delErr) {
+      alert(`Erro ao restaurar: ${delErr.message}`);
+      return;
+    }
+    await buscar();
   }
 
   function abrirAvulso(tx: C6Transaction) {
@@ -548,12 +593,21 @@ export default function Conciliacao() {
                           {fmtBRL(txAmount(tx))}
                         </span>
                         {!abertoAqui && (
-                          <button
-                            onClick={() => abrirAvulso(tx)}
-                            className="px-3 py-1.5 rounded-md bg-ledger text-white text-xs font-medium hover:bg-ledger-dark transition-colors shrink-0"
-                          >
-                            + Registrar
-                          </button>
+                          <>
+                            <button
+                              onClick={() => abrirAvulso(tx)}
+                              className="px-3 py-1.5 rounded-md bg-ledger text-white text-xs font-medium hover:bg-ledger-dark transition-colors shrink-0"
+                            >
+                              + Registrar
+                            </button>
+                            <button
+                              onClick={() => ignorarTx(tx)}
+                              title="Não conta e não registra — some desta lista"
+                              className="px-3 py-1.5 rounded-md border border-line bg-white text-muted text-xs font-medium hover:text-ink hover:bg-paper transition-colors shrink-0"
+                            >
+                              Ignorar
+                            </button>
+                          </>
                         )}
                       </div>
                       {abertoAqui && (
@@ -670,7 +724,47 @@ export default function Conciliacao() {
               </div>
               <p className="text-xs text-muted mt-2">
                 Use <strong>Registrar</strong> pra lançar direto (reembolso não afeta DRE; operacional entra na DRE com a categoria escolhida).
+                Use <strong>Ignorar</strong> pra tirar da lista sem registrar nada.
               </p>
+            </div>
+          )}
+
+          {/* lançamentos ignorados — fora da conciliação, mas dá pra restaurar */}
+          {ignoradosTx.length > 0 && (
+            <div>
+              <button
+                onClick={() => setVerIgnorados((v) => !v)}
+                className="text-xs text-muted hover:text-ink underline underline-offset-2"
+              >
+                {verIgnorados ? "Esconder" : "Ver"} {ignoradosTx.length}{" "}
+                {ignoradosTx.length === 1 ? "lançamento ignorado" : "lançamentos ignorados"}
+              </button>
+              {verIgnorados && (
+                <div className="mt-2 bg-white border border-line rounded-xl divide-y divide-line overflow-hidden">
+                  {ignoradosTx.map((tx, i) => {
+                    const ref = txRef(tx) ?? String(i);
+                    const isOut = tx.operation_type === "OUTGOING";
+                    return (
+                      <div key={ref} className="p-3 flex items-center gap-3">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${isOut ? "bg-crimson" : "bg-emerald-500"}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-ink truncate">{txDescription(tx)}</p>
+                          <p className="text-xs text-muted">{fmtDate(txDate(tx))}</p>
+                        </div>
+                        <span className={`text-sm font-semibold shrink-0 ${isOut ? "text-crimson" : "text-emerald-600"}`}>
+                          {fmtBRL(txAmount(tx))}
+                        </span>
+                        <button
+                          onClick={() => restaurarTx(tx)}
+                          className="px-3 py-1.5 rounded-md border border-line text-xs font-medium text-ledger-dark hover:bg-paper transition-colors shrink-0"
+                        >
+                          Restaurar
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </>
