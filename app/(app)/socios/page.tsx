@@ -142,6 +142,25 @@ export default function SociosPage() {
     load();
   }
 
+  // Categoria usada nas contas a pagar de pró-labore, pra a DRE mostrar uma linha própria
+  // (e não misturar em "Sem categoria"). Cria como custo fixo se ainda não existir.
+  async function categoriaProLaboreId(): Promise<string | null> {
+    const nome = "Salários e Pró-labore";
+    const { data: existente } = await supabase
+      .from("categorias")
+      .select("id")
+      .eq("nome", nome)
+      .order("created_at")
+      .limit(1);
+    if (existente && existente.length > 0) return existente[0].id as string;
+    const { data: criada } = await supabase
+      .from("categorias")
+      .insert({ nome, tipo: "pagar", tipo_custo: "fixo" })
+      .select("id")
+      .single();
+    return (criada?.id as string) ?? null;
+  }
+
   async function handleRegistrarProLabore(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -151,10 +170,12 @@ export default function SociosPage() {
     const data = novoProLabore.data || new Date().toISOString().slice(0, 10);
 
     if (novoProLabore.jaPago) {
+      const categoria_id = await categoriaProLaboreId();
       const { data: contaPagar } = await supabase
         .from("contas_pagar")
         .insert({
           descricao: `Pró-labore - ${socio?.nome ?? "Sócio"}`,
+          categoria_id,
           valor: valorNum,
           data_vencimento: data,
           data_pagamento: data,
@@ -191,11 +212,13 @@ export default function SociosPage() {
   async function marcarProLaborePago(pl: ProLabore) {
     const socio = socios.find((s) => s.id === pl.socio_id);
     const hoje = new Date().toISOString().slice(0, 10);
+    const categoria_id = await categoriaProLaboreId();
 
     const { data: contaPagar } = await supabase
       .from("contas_pagar")
       .insert({
         descricao: `Pró-labore - ${socio?.nome ?? "Sócio"}`,
+        categoria_id,
         valor: pl.valor,
         data_vencimento: pl.data_vencimento,
         data_pagamento: hoje,
