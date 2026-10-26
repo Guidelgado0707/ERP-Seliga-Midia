@@ -66,9 +66,16 @@ type ContaRow = {
   cliente?: string | null;
   valor: number;
   data_vencimento: string;
+  observacoes?: string | null;
 };
 
-type Candidato = { tipo: "pagar" | "receber"; conta: ContaRow };
+// aproximado = valor do banco difere um pouco do valor da conta (retenção na fonte, taxa,
+// valor estimado que fechou diferente...). Sugerido pra não virar avulso duplicado.
+type Candidato = { tipo: "pagar" | "receber"; conta: ContaRow; aproximado?: boolean };
+
+// match aproximado: até 5% de diferença (retenção tributária é 5%) e até 15 dias do vencimento
+const TOLERANCIA_APROX = 0.0501;
+const JANELA_DIAS_APROX = 15;
 
 type Sugestao = { tx: C6Transaction; candidatos: Candidato[] };
 
@@ -154,12 +161,12 @@ export default function Conciliacao() {
       const [pagarRes, receberRes] = await Promise.all([
         supabase
           .from("contas_pagar")
-          .select("id, descricao, fornecedor, valor, data_vencimento")
+          .select("id, descricao, fornecedor, valor, data_vencimento, observacoes")
           .in("status", ["pendente", "atrasado"])
           .is("banco_referencia", null),
         supabase
           .from("contas_receber")
-          .select("id, descricao, cliente, valor, data_vencimento")
+          .select("id, descricao, cliente, valor, data_vencimento, observacoes")
           .in("status", ["pendente", "atrasado"])
           .is("banco_referencia", null),
       ]);
@@ -185,13 +192,35 @@ export default function Conciliacao() {
         const isOut = tx.operation_type === "OUTGOING";
         const pool = isOut ? contasPagar : contasReceber;
         const brutos = pool.filter((c) => Math.abs(Number(c.valor) - valorTx) < 0.01);
+        const dataTx = txDate(tx);
 
         if (brutos.length === 0) {
-          novoSemMatch.push(tx);
+          // sem valor igual: tenta valor próximo (até 5%, perto do vencimento) antes de mandar pra "sem conta"
+          const proximos = pool
+            .filter((c) => {
+              const v = Number(c.valor);
+              return (
+                v > 0 &&
+                Math.abs(v - valorTx) / v <= TOLERANCIA_APROX &&
+                Math.abs(diffDias(c.data_vencimento, dataTx)) <= JANELA_DIAS_APROX
+              );
+            })
+            .sort(
+              (a, b) =>
+                Math.abs(diffDias(a.data_vencimento, dataTx)) -
+                Math.abs(diffDias(b.data_vencimento, dataTx))
+            );
+          if (proximos.length === 0) {
+            novoSemMatch.push(tx);
+          } else {
+            novasSugestoes.push({
+              tx,
+              candidatos: proximos.map((c) => ({ tipo: isOut ? "pagar" : "receber", conta: c, aproximado: true })),
+            });
+          }
           continue;
         }
 
-        const dataTx = txDate(tx);
         const ordenados = [...brutos].sort(
           (a, b) =>
             Math.abs(diffDias(a.data_vencimento, dataTx)) -
@@ -344,6 +373,24 @@ export default function Conciliacao() {
   async function confirmar(tx: C6Transaction, candidato: Candidato) {
     const ref = txRef(tx);
     if (!ref) return;
+
+    // valor do banco diferente do da conta (retenção, taxa, estimado que fechou diferente):
+    // o usuário prefere que a conta reflita o valor realmente movimentado (líquido).
+    const valorConta = Number(candidato.conta.valor);
+    const valorTx = txAmount(tx);
+    const diferente = Math.abs(valorConta - valorTx) >= 0.01;
+    let ajuste: { valor: number; observacoes: string } | null = null;
+    if (diferente) {
+      const ok = window.confirm(
+        `O banco mostra ${fmtBRL(valorTx)} e a conta "${candidato.conta.descricao}" está em ${fmtBRL(valorConta)}.\n\n` +
+          `OK = atualizar a conta pro valor real (${fmtBRL(valorTx)}) e confirmar.\nCancelar = não confirmar agora.`,
+      );
+      if (!ok) return;
+      const nota = `Valor previsto ${fmtBRL(valorConta)}; ${candidato.tipo === "pagar" ? "pago" : "recebido"} ${fmtBRL(valorTx)} (conciliado com o banco)`;
+      const anterior = candidato.conta.observacoes?.trim();
+      ajuste = { valor: valorTx, observacoes: anterior ? `${anterior} | ${nota}` : nota };
+    }
+
     setConfirmando(ref);
 
     const tabela = candidato.tipo === "pagar" ? "contas_pagar" : "contas_receber";
@@ -359,6 +406,7 @@ export default function Conciliacao() {
         [campoData]: dataEntrada,
         [campoEm]: new Date().toISOString(),
         banco_referencia: ref,
+        ...(ajuste ?? {}),
       })
       .eq("id", candidato.conta.id);
 
@@ -499,7 +547,7 @@ export default function Conciliacao() {
                                 }
                                 className="w-full border border-line rounded-md px-2 py-1.5 text-sm"
                               >
-                                <optgroup label="Sugestão (valor igual)">
+                                <optgroup label={s.candidatos[0].aproximado ? "Sugestão (valor próximo)" : "Sugestão (valor igual)"}>
                                   {s.candidatos.map((c) => (
                                     <option key={c.conta.id} value={c.conta.id}>
                                       {c.conta.descricao} ({c.conta.fornecedor ?? c.conta.cliente ?? "—"}) ·{" "}
@@ -522,8 +570,8 @@ export default function Conciliacao() {
                               {!bate && (
                                 <p className="text-[11px] text-amber-700 mt-1">
                                   ⚠ valor da conta ({fmtBRL(valorConta)}) diferente do banco (
-                                  {fmtBRL(valorTx)}). Ao confirmar, a conta é marcada como paga/recebida
-                                  com o valor da conta — se precisar ajustar, edite depois na tela A Pagar/Receber.
+                                  {fmtBRL(valorTx)}). Ao confirmar, pergunto se atualizo a conta pro valor
+                                  realmente {isOut ? "pago" : "recebido"} (ex: retenção na fonte).
                                 </p>
                               )}
                             </div>
