@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabaseClient";
 import { StatCard, StatusBadge } from "@/components/Card";
 import { currentMonthValue, monthValueRange, monthLabel } from "@/lib/dateUtils";
 
-// Projeto JC roda de maio (começou dia 15/05) a outubro de 2026 — filtro de mês fica restrito a esse período.
+// Projeto JC começou dia 15/05/2026 — o filtro de mês lista de maio até dezembro de 2026. Segue em novembro
+// (cartão azul e receita do JC continuam lançados); estender aqui se o projeto passar de dezembro.
 const PROJETO_JC_MESES = [
   { value: "2026-05", label: monthLabel(2026, 4) },
   { value: "2026-06", label: monthLabel(2026, 5) },
@@ -13,6 +14,8 @@ const PROJETO_JC_MESES = [
   { value: "2026-08", label: monthLabel(2026, 7) },
   { value: "2026-09", label: monthLabel(2026, 8) },
   { value: "2026-10", label: monthLabel(2026, 9) },
+  { value: "2026-11", label: monthLabel(2026, 10) },
+  { value: "2026-12", label: monthLabel(2026, 11) },
 ];
 
 function mesInicialProjetoJC() {
