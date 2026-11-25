@@ -109,7 +109,7 @@ export default function PropostaDocumento({
   return (
     <div
       id="proposta-print-area"
-      className="bg-white"
+      className={isTreinamento ? "bg-white flex flex-col min-h-[296mm]" : "bg-white"}
       style={{ fontFamily: "Arial, Helvetica, sans-serif", colorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as React.CSSProperties}
     >
       {/* Header */}
@@ -154,37 +154,37 @@ export default function PropostaDocumento({
       </div>
 
       {/* Corpo branco: parceria / objetivo / frentes */}
-      <div className="px-8 py-6">
+      <div className={isTreinamento ? "px-8 py-10 flex-1" : "px-8 py-6"}>
         {isTreinamento ? (
-        <div className="mb-6">
-          <p className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: ORANGE }}>
+        <div className="mb-10">
+          <p className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: ORANGE }}>
             A Proposta
           </p>
-          <p className="text-[13px] text-neutral-700 leading-snug mb-4">
+          <p className="text-[15px] text-neutral-700 leading-relaxed mb-8">
             {artigo && `${artigo} `}
             <strong>{nomeCriador}</strong> leva à {nomeEmpresa} um treinamento prático de redes sociais para a
             equipe de vendas: como usar o perfil, o conteúdo e o relacionamento online para atrair clientes e
             vender mais.
           </p>
 
-          <p className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: ORANGE }}>
+          <p className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: ORANGE }}>
             Objetivo
           </p>
-          <p className="text-[13px] text-neutral-700 leading-snug mb-4">
+          <p className="text-[15px] text-neutral-700 leading-relaxed mb-8">
             Ensinar os vendedores a usar mais as redes sociais para vender: construir presença e credibilidade,
             gerar conversas com potenciais clientes e transformar esse movimento em oportunidades reais de venda
             para a {nomeEmpresa}.
           </p>
 
-          <p className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: ORANGE }}>
+          <p className="text-[11px] font-bold tracking-widest uppercase mb-2" style={{ color: ORANGE }}>
             Conteúdo do treinamento
           </p>
           {resumo ? (
-            <p className="text-[13px] text-neutral-700 leading-snug whitespace-pre-line">{resumo}</p>
+            <p className="text-[15px] text-neutral-700 leading-relaxed whitespace-pre-line">{resumo}</p>
           ) : (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2">
               {PROGRAMA_TREINAMENTO_PADRAO.map((f) => (
-                <p key={f} className="text-[13px] text-neutral-700 flex items-start gap-1.5">
+                <p key={f} className="text-[15px] text-neutral-700 flex items-start gap-1.5">
                   <span style={{ color: ORANGE }}>•</span> {f}
                 </p>
               ))}
