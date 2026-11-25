@@ -106,12 +106,13 @@ export default function PropostaDocumento({
   const isSeligaMidia = nomeCriador === "Seliga Mídia";
   const isTreinamento = tipo === "treinamento";
 
-  // treinamento ocupa a folha toda: na tela usa a altura A4 em mm; na impressão usa a altura da própria página
-  // (vh), porque o Safari monta a página de impressão ~1,25x mais larga e reduz depois — em mm ficaria ~80% da folha.
+  // treinamento ocupa a folha toda: na tela usa a altura A4 em mm; na impressão o rodapé + faixa laranja ficam
+  // fixos no pé da folha (position: fixed), que funciona igual no Chrome e no Safari. Altura em mm/vh não serve:
+  // o Safari monta a página de impressão em outra escala e o rodapé caía na página 2.
   return (
     <div
       id="proposta-print-area"
-      className={isTreinamento ? "bg-white flex flex-col min-h-[296mm] print:min-h-[calc(100vh-1px)]" : "bg-white"}
+      className={isTreinamento ? "bg-white flex flex-col min-h-[296mm] print:min-h-0" : "bg-white"}
       style={{ fontFamily: "Arial, Helvetica, sans-serif", colorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as React.CSSProperties}
     >
       {/* Header */}
@@ -322,7 +323,8 @@ export default function PropostaDocumento({
       </div>
       )}
 
-      {/* Footer */}
+      {/* Footer + faixa laranja (no treinamento, na impressão, fixos no pé da folha) */}
+      <div className={isTreinamento ? "print:fixed print:bottom-0 print:inset-x-0 print:bg-white" : undefined}>
       <div className="px-8 pb-6">
         <div className="border-t border-neutral-200 pt-3 flex flex-col md:flex-row md:items-end md:justify-between gap-2">
           <p className="text-[11px] text-neutral-500 max-w-md leading-snug">
@@ -340,6 +342,7 @@ export default function PropostaDocumento({
       </div>
 
       <div style={{ backgroundColor: ORANGE }} className="h-2.5 w-full" />
+      </div>
     </div>
   );
 }

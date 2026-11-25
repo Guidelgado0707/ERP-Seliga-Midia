@@ -41,6 +41,11 @@
   body:has(#proposta-print-area) #proposta-print-area * {
     visibility: visible;
   }
+  /* fundo da página branco: o rodapé fixo no pé da folha não deixa faixa cinza do fundo do app aparecendo */
+  html:has(#proposta-print-area),
+  body:has(#proposta-print-area) {
+    background: #fff !important;
+  }
   #proposta-print-area {
     position: absolute;
     top: 0;
