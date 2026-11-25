@@ -106,10 +106,12 @@ export default function PropostaDocumento({
   const isSeligaMidia = nomeCriador === "Seliga Mídia";
   const isTreinamento = tipo === "treinamento";
 
+  // treinamento ocupa a folha toda: na tela usa a altura A4 em mm; na impressão usa a altura da própria página
+  // (vh), porque o Safari monta a página de impressão ~1,25x mais larga e reduz depois — em mm ficaria ~80% da folha.
   return (
     <div
       id="proposta-print-area"
-      className={isTreinamento ? "bg-white flex flex-col min-h-[296mm]" : "bg-white"}
+      className={isTreinamento ? "bg-white flex flex-col min-h-[296mm] print:min-h-[calc(100vh-1px)]" : "bg-white"}
       style={{ fontFamily: "Arial, Helvetica, sans-serif", colorAdjust: "exact", WebkitPrintColorAdjust: "exact" } as React.CSSProperties}
     >
       {/* Header */}
