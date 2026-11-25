@@ -9,6 +9,7 @@ type Proposta = {
   empresa: string;
   criador: string;
   meses: number;
+  tipo: string | null; // "conteudo" (padrão) ou "treinamento"
   opcoes: PropostaOpcao[] | null;
   // legado: propostas criadas antes das opções múltiplas
   quantidade_videos: number | null;
@@ -56,6 +57,7 @@ export default function PropostasPage() {
   const [form, setForm] = useState({
     empresa: "",
     criador: CRIADORES[0] as string,
+    tipo: "conteudo",
     meses: "3",
     resumo: "",
   });
@@ -89,7 +91,7 @@ export default function PropostasPage() {
   }
 
   function resetForm() {
-    setForm({ empresa: "", criador: CRIADORES[0], meses: "3", resumo: "" });
+    setForm({ empresa: "", criador: CRIADORES[0], tipo: "conteudo", meses: "3", resumo: "" });
     setOpcoes(OPCOES_PADRAO.map((o) => ({ ...o })));
     setEditingId(null);
   }
@@ -99,6 +101,7 @@ export default function PropostasPage() {
     setForm({
       empresa: p.empresa,
       criador: p.criador,
+      tipo: p.tipo ?? "conteudo",
       meses: String(p.meses),
       resumo: p.resumo ?? "",
     });
@@ -124,7 +127,8 @@ export default function PropostasPage() {
     const payload = {
       empresa: form.empresa,
       criador: form.criador,
-      meses: Number(form.meses),
+      tipo: form.tipo,
+      meses: form.tipo === "treinamento" ? 1 : Number(form.meses),
       opcoes: opcoesValidas,
       resumo: form.resumo || null,
     };
@@ -160,6 +164,7 @@ export default function PropostasPage() {
             empresa={visualizando.empresa}
             criador={visualizando.criador}
             meses={visualizando.meses}
+            tipo={visualizando.tipo}
             opcoes={opcoesDe(visualizando)}
             resumo={visualizando.resumo}
           />
@@ -214,15 +219,25 @@ export default function PropostasPage() {
               </option>
             ))}
           </select>
-          <input
-            required
-            type="number"
-            min="1"
-            placeholder="Quantidade de meses (pra frase de abertura)"
-            value={form.meses}
-            onChange={(e) => setForm({ ...form, meses: e.target.value })}
-            className="px-3 py-2.5 rounded-md border border-line text-sm font-mono md:col-span-2"
-          />
+          <select
+            value={form.tipo}
+            onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+            className="px-3 py-2.5 rounded-md border border-line text-sm md:col-span-2"
+          >
+            <option value="conteudo">Tipo: Parceria de conteúdo (vídeos)</option>
+            <option value="treinamento">Tipo: Treinamento (ex: redes sociais pra vendedores)</option>
+          </select>
+          {form.tipo !== "treinamento" && (
+            <input
+              required
+              type="number"
+              min="1"
+              placeholder="Quantidade de meses (pra frase de abertura)"
+              value={form.meses}
+              onChange={(e) => setForm({ ...form, meses: e.target.value })}
+              className="px-3 py-2.5 rounded-md border border-line text-sm font-mono md:col-span-2"
+            />
+          )}
 
           <div className="md:col-span-2">
             <p className="text-xs font-medium text-muted mb-2">
@@ -273,7 +288,11 @@ export default function PropostasPage() {
           </div>
 
           <textarea
-            placeholder="Resumo dos vídeos que podemos fazer (opcional — se deixar em branco, usa as frentes de conteúdo padrão)"
+            placeholder={
+              form.tipo === "treinamento"
+                ? "Conteúdo/programa do treinamento (opcional — se deixar em branco, usa o programa padrão)"
+                : "Resumo dos vídeos que podemos fazer (opcional — se deixar em branco, usa as frentes de conteúdo padrão)"
+            }
             value={form.resumo}
             onChange={(e) => setForm({ ...form, resumo: e.target.value })}
             rows={3}
@@ -305,7 +324,8 @@ export default function PropostasPage() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink truncate">{p.empresa}</p>
                 <p className="text-xs text-muted truncate">
-                  {p.criador} · {opts.length === 0 ? "sem opções" : opts.map((o) => o.titulo).join(" · ")} ·{" "}
+                  {p.criador}
+                  {p.tipo === "treinamento" ? " · Treinamento" : ""} · {opts.length === 0 ? "sem opções" : opts.map((o) => o.titulo).join(" · ")} ·{" "}
                   {new Date(p.created_at).toLocaleDateString("pt-BR")}
                 </p>
               </div>

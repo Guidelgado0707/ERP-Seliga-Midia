@@ -161,6 +161,8 @@ create table propostas (
   criador text not null default 'Girando na Alta'
     check (criador in ('Girando na Alta', 'Lucas Feitoza', 'Seliga Mídia')),
   meses integer not null default 3,
+  -- 'conteudo' = parceria de vídeos (padrão); 'treinamento' = capacitação (ex: redes sociais pra vendedores)
+  tipo text not null default 'conteudo' check (tipo in ('conteudo', 'treinamento')),
   -- legado: proposta antiga usa esses dois (um único preço). Proposta nova
   -- usa "opcoes" (várias opções de preço, ex: avulso / pacote / mensal).
   quantidade_videos integer,

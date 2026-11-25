@@ -32,6 +32,15 @@ const FRENTES_PADRAO = [
   "Oportunidades comerciais",
 ];
 
+// Proposta do tipo "treinamento" (ex: treinar vendedores pra usar redes sociais): mesmo layout, texto próprio.
+// Programa padrão — pode ser trocado digitando o programa no campo "resumo" da proposta.
+const PROGRAMA_TREINAMENTO_PADRAO = [
+  "Perfil profissional do vendedor",
+  "Conteúdo simples sobre veículos e o dia a dia da loja",
+  "Abordagem e relacionamento com clientes",
+  "Rotina de postagem e metas",
+];
+
 const ESCOPO = [
   "Planejamento",
   "Pautas",
@@ -57,6 +66,8 @@ export type PropostaDados = {
   empresa: string;
   criador?: Criador | string | null;
   meses: number;
+  // "conteudo" (parceria de vídeos, padrão) ou "treinamento" (capacitação da equipe de vendas)
+  tipo?: string | null;
   opcoes?: PropostaOpcao[] | null;
   // legado: propostas antigas (antes das opções múltiplas) só tinham isso
   quantidade_videos?: number | null;
@@ -68,6 +79,7 @@ export default function PropostaDocumento({
   empresa,
   criador,
   meses,
+  tipo,
   opcoes,
   quantidade_videos,
   valor_unitario,
@@ -91,6 +103,7 @@ export default function PropostaDocumento({
   const nomeCriador: Criador = (criador as Criador) && GRAMATICA[criador as Criador] ? (criador as Criador) : "Girando na Alta";
   const { artigo, contraido } = GRAMATICA[nomeCriador];
   const isSeligaMidia = nomeCriador === "Seliga Mídia";
+  const isTreinamento = tipo === "treinamento";
 
   return (
     <div
@@ -117,19 +130,67 @@ export default function PropostaDocumento({
             {nomeEmpresa.toUpperCase()} + {nomeCriador.toUpperCase()}
           </p>
           <h1 className="text-white font-bold text-2xl md:text-[28px] leading-tight mb-2">
-            Conteúdo que movimenta
-            <br />
-            marca, público e negócio.
+            {isTreinamento ? (
+              <>
+                Treinamento que coloca as redes
+                <br />
+                sociais a serviço das vendas.
+              </>
+            ) : (
+              <>
+                Conteúdo que movimenta
+                <br />
+                marca, público e negócio.
+              </>
+            )}
           </h1>
           <p className="text-white/70 text-[13px]">
-            Uma parceria de {meses} {meses === 1 ? "mês" : "meses"} para construir presença digital recorrente e
-            relevante.
+            {isTreinamento
+              ? `Capacitação prática para a equipe de vendas da ${nomeEmpresa}.`
+              : `Uma parceria de ${meses} ${meses === 1 ? "mês" : "meses"} para construir presença digital recorrente e relevante.`}
           </p>
         </div>
       </div>
 
       {/* Corpo branco: parceria / objetivo / frentes */}
       <div className="px-8 py-6">
+        {isTreinamento ? (
+        <div className="mb-6">
+          <p className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: ORANGE }}>
+            A Proposta
+          </p>
+          <p className="text-[13px] text-neutral-700 leading-snug mb-4">
+            {artigo && `${artigo} `}
+            <strong>{nomeCriador}</strong> leva à {nomeEmpresa} um treinamento prático de redes sociais para a
+            equipe de vendas: como usar o perfil, o conteúdo e o relacionamento online para atrair clientes e
+            vender mais.
+          </p>
+
+          <p className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: ORANGE }}>
+            Objetivo
+          </p>
+          <p className="text-[13px] text-neutral-700 leading-snug mb-4">
+            Ensinar os vendedores a usar mais as redes sociais para vender: construir presença e credibilidade,
+            gerar conversas com potenciais clientes e transformar esse movimento em oportunidades reais de venda
+            para a {nomeEmpresa}.
+          </p>
+
+          <p className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: ORANGE }}>
+            Conteúdo do treinamento
+          </p>
+          {resumo ? (
+            <p className="text-[13px] text-neutral-700 leading-snug whitespace-pre-line">{resumo}</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              {PROGRAMA_TREINAMENTO_PADRAO.map((f) => (
+                <p key={f} className="text-[13px] text-neutral-700 flex items-start gap-1.5">
+                  <span style={{ color: ORANGE }}>•</span> {f}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+        ) : (
         <div className="mb-6">
           <p className="text-[10px] font-bold tracking-widest uppercase mb-1.5" style={{ color: ORANGE }}>
             A Parceria
@@ -164,6 +225,7 @@ export default function PropostaDocumento({
             </div>
           )}
         </div>
+        )}
 
         {/* Opções de investimento: cartões lado a lado (avulso / pacote / mensal / etc.) */}
         {opcoesEfetivas.length > 0 && (
@@ -187,14 +249,15 @@ export default function PropostaDocumento({
             </div>
             <div style={{ backgroundColor: NAVY }} className="rounded-md py-2.5 px-3 text-center mt-3">
               <p className="text-white text-[10px] font-bold tracking-wide uppercase leading-snug">
-                Planejamento, produção e entrega inclusos
+                {isTreinamento ? "Treinamento prático aplicado à rotina de vendas da equipe" : "Planejamento, produção e entrega inclusos"}
               </p>
             </div>
           </div>
         )}
       </div>
 
-      {/* Audiência */}
+      {/* Audiência (só proposta de conteúdo) */}
+      {!isTreinamento && (
       <div style={{ backgroundColor: NAVY }} className="px-8 py-5">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <p className="text-white text-[11px] font-bold tracking-wide uppercase">
@@ -237,8 +300,10 @@ export default function PropostaDocumento({
           <p>{AUDIENCIA.nota2}</p>
         </div>
       </div>
+      )}
 
-      {/* Escopo de entrega */}
+      {/* Escopo de entrega (só proposta de conteúdo) */}
+      {!isTreinamento && (
       <div className="px-8 py-5">
         <p className="text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: ORANGE }}>
           Escopo de entrega
@@ -252,13 +317,15 @@ export default function PropostaDocumento({
           ))}
         </p>
       </div>
+      )}
 
       {/* Footer */}
       <div className="px-8 pb-6">
         <div className="border-t border-neutral-200 pt-3 flex flex-col md:flex-row md:items-end md:justify-between gap-2">
           <p className="text-[11px] text-neutral-500 max-w-md leading-snug">
-            A linha editorial será definida em conjunto, alinhando os objetivos comerciais da {nomeEmpresa} à
-            identidade {contraido} {nomeCriador}.
+            {isTreinamento
+              ? `O conteúdo e o formato do treinamento serão definidos em conjunto, alinhando-os à rotina e aos objetivos de vendas da ${nomeEmpresa}.`
+              : `A linha editorial será definida em conjunto, alinhando os objetivos comerciais da ${nomeEmpresa} à identidade ${contraido} ${nomeCriador}.`}
           </p>
           <div className="text-right">
             <p className="text-[11px] text-neutral-500">Proposta válida por 15 dias.</p>
