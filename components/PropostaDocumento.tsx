@@ -37,6 +37,7 @@ const FRENTES_PADRAO = [
 const PROGRAMA_TREINAMENTO_PADRAO = [
   "Perfil profissional do vendedor",
   "Conteúdo simples sobre veículos e o dia a dia da loja",
+  "Noções básicas de captação e edição",
   "Abordagem e relacionamento com clientes",
   "Rotina de postagem e metas",
 ];
